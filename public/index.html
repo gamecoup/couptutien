@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cờ Úp Tu Tiên</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="gameWrap">
+    <div class="wrap">
+      <div class="board-row">
+        <div class="left-col">
+          <div class="caps" id="capRed" title="Đỏ ăn được"></div>
+          <div class="mid-tools">
+            <div class="spec-box" id="specBox">0<span class="spec-lab">xem cờ</span></div>
+            <div class="tool-stack">
+              <div class="sound-wrap" id="soundWrap">
+                <button id="btnSpeaker" title="Âm thanh">🔊</button>
+                <div class="sound-pop">
+                  <label><input type="checkbox" id="chkMusic" checked> Nhạc nền</label>
+                  <label>Nhạc <input type="range" id="volMusic" min="0" max="100" value="40"></label>
+                  <label><input type="checkbox" id="chkSfx" checked> Tiếng động</label>
+                  <label>Hiệu ứng <input type="range" id="volSfx" min="0" max="100" value="80"></label>
+                </div>
+              </div>
+              <div class="time-wrap" id="timeWrap">
+                <button id="btnTime">⏱</button>
+                <div class="time-pop" id="modes"></div>
+              </div>
+              <button id="btnHome" class="secondary" title="Về trang chính">↩</button>
+            </div>
+          </div>
+          <div class="caps" id="capBlack" title="Đen ăn được"></div>
+        </div>
+        <div class="board-stage">
+          <canvas id="board" width="640" height="720"></canvas>
+          <div id="readyGate">
+            <div class="gate-box">
+              <p class="hint" id="waitHint">Đang ngồi chờ đối thủ...</p>
+              <p class="hint" id="netHint"></p>
+              <button id="btnReady">Sẵn sàng</button>
+              <button id="btnStart">Bắt đầu</button>
+            </div>
+          </div>
+          <div id="drawAsk">
+            <div class="box">
+              <h2>Đối thủ cầu hòa</h2>
+              <p class="hint">Đồng ý hay từ chối?</p>
+              <button id="btnDrawYes">Đồng ý hòa</button>
+              <button id="btnDrawNo" class="secondary">Từ chối</button>
+            </div>
+          </div>
+        </div>
+        <div class="side-clocks">
+          <div class="player">
+            <div class="av-wrap" id="wrapRed">
+              <svg class="av-ring" viewBox="0 0 72 72" aria-hidden="true">
+                <circle class="track" cx="36" cy="36" r="32"></circle>
+                <circle class="prog" id="ringRed" cx="36" cy="36" r="32"></circle>
+              </svg>
+              <button class="avatar" id="avRed" title="Tải ảnh Đỏ"><span class="ph">🔴</span></button>
+              <div class="move-num" id="mvRed">—</div>
+            </div>
+            <input type="file" id="fileRed" accept="image/*" hidden>
+            <div class="clock" id="clkRed">
+              <div class="who" id="whoRed">Đỏ</div>
+              <div class="game" id="tRed">03:00</div>
+            </div>
+            <div class="rank-box" id="rankRed"></div>
+          </div>
+          <div class="side-actions">
+            <button id="btnDraw">Cầu hòa</button>
+            <button id="btnResign">Xin thua</button>
+            <div class="chat-wrap" id="chatWrap">
+              <button id="btnChat">💬 Chat</button>
+              <div class="chat-pop" id="chatPop"></div>
+            </div>
+            <div id="chatToast"></div>
+          </div>
+          <div class="player">
+            <div class="av-wrap" id="wrapBlack">
+              <svg class="av-ring" viewBox="0 0 72 72" aria-hidden="true">
+                <circle class="track" cx="36" cy="36" r="32"></circle>
+                <circle class="prog" id="ringBlack" cx="36" cy="36" r="32"></circle>
+              </svg>
+              <button class="avatar" id="avBlack" title="Tải ảnh Đen"><span class="ph">⚫</span></button>
+              <div class="move-num" id="mvBlack">—</div>
+            </div>
+            <input type="file" id="fileBlack" accept="image/*" hidden>
+            <div class="clock" id="clkBlack">
+              <div class="who" id="whoBlack">Đen</div>
+              <div class="game" id="tBlack">03:00</div>
+            </div>
+            <div class="rank-box" id="rankBlack"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status" id="status" hidden></div>
+  </div>
+
+  <div id="home" class="show">
+    <div class="home-brand">CỜ ÚP TU TIÊN</div>
+    <div class="home-music">
+      <button id="btnHomeMusic" type="button">🎵</button>
+      <input type="range" id="volHome" min="0" max="100" value="35" title="Nhạc trang chính">
+    </div>
+    <div class="home-row">
+      <div class="home-side">
+        <h2>Tìm đạo hữu</h2>
+        <div id="findBox">
+          <input id="findName" placeholder="Tên / SĐT / email" maxlength="40">
+          <button id="btnFind">Tìm</button>
+        </div>
+        <div id="findList"></div>
+        <button id="btnPlayNow" type="button">Chơi<br>ngay</button>
+      </div>
+      <div class="home-center">
+        <div class="id-card">
+          <button class="home-av" id="homeAv" title="Đổi ảnh"><span class="ph">🧙</span></button>
+          <input type="file" id="fileHome" accept="image/*" hidden>
+          <div class="av-actions">
+            <button id="btnHomeSave" class="ghost" hidden>Lưu ảnh</button>
+            <button id="btnHomeBrowse" class="ghost" hidden>Duyệt</button>
+          </div>
+          <div class="name-row">
+            <input id="homeName" maxlength="16" placeholder="Tên đạo hữu" readonly>
+            <button id="btnSaveName" class="ghost" hidden>Lưu tên</button>
+          </div>
+          <div class="home-stats" id="homeStats"></div>
+          <button id="btnBlockInv" class="ghost" type="button">Cho phép lời mời</button>
+        </div>
+        <p class="hint" id="homeHint">Hãy đăng nhập hoặc vào với tư cách khách để chơi.</p>
+        <div id="authBtns">
+          <button id="btnRegister">Đăng ký</button>
+          <button id="btnLogin" class="secondary">Đăng nhập</button>
+          <button id="btnLogout" class="secondary" style="display:none">Đăng xuất</button>
+        </div>
+        <div id="loginChoice">
+          <button id="btnLoginMail">Đăng nhập bằng email</button>
+          <button id="btnLoginGuest" class="secondary">Vào với tư cách khách</button>
+        </div>
+        <div id="idBox">
+          <input id="accContact" placeholder="Email / SĐT / Facebook" maxlength="40">
+          <div class="pass-row">
+            <input id="accPass" type="password" placeholder="Mật khẩu" maxlength="32">
+            <button type="button" id="btnEye" class="secondary">Hiện</button>
+            <label class="remember" title="Nhớ mật khẩu trên máy này">
+              <input type="checkbox" id="chkRemember">
+              <span class="tick">✓</span>
+              Nhớ mật khẩu
+            </label>
+          </div>
+          <input id="accPass2" type="password" placeholder="Nhập lại mật khẩu" maxlength="32">
+          <select id="accVia">
+            <option value="email">Email</option>
+            <option value="phone">SĐT</option>
+            <option value="facebook">Facebook</option>
+          </select>
+          <button id="btnForgot" class="secondary">Quên mật khẩu</button>
+          <button id="btnAuthGo">Tiếp tục</button>
+          <button id="btnAuthCancel" class="secondary">Đóng</button>
+        </div>
+        <button id="btnHero">
+          <div class="hero-art">🏯 ♟️ 🧚</div>
+          <div>CỜ ÚP TU TIÊN</div>
+          <div class="hero-sub">Bấm để ngồi bàn chờ tỷ thí</div>
+        </button>
+      </div>
+      <div class="home-side">
+        <h2>Sảnh cờ</h2>
+        <p class="hint">Các bàn đang chờ hoặc đang đấu.</p>
+        <button id="btnHallHome">Sảnh bàn cờ</button>
+        <button id="btnOnline" class="ghost" type="button">0 người đang online</button>
+        <div id="onlinePop">
+          <div class="online-head">Đạo hữu đang online</div>
+          <div id="onlineList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="authPop">
+    <div class="ov-box">
+      <div class="ov-title" id="authTitle">Xác nhận</div>
+      <div class="ov-reason" id="authText"></div>
+      <input id="authOtp" placeholder="Mã OTP 6 số" maxlength="6" style="display:none;padding:8px;border-radius:8px;border:0;margin:8px">
+      <input id="authNewPass" type="password" placeholder="Mật khẩu mới" maxlength="32" style="display:none;padding:8px;border-radius:8px;border:0;margin:8px">
+      <div>
+        <button id="btnAuthYes">Đồng ý</button>
+        <button id="btnAuthNo" class="secondary">Hủy</button>
+      </div>
+    </div>
+  </div>
+  <div id="leavePop">
+    <div class="ov-box">
+      <div class="ov-title">Về trang chính?</div>
+      <div class="ov-reason">Bỏ đi = thoát bàn và bị xử thua. Ở lại = tiếp tục.</div>
+      <button id="btnLeaveYes">Bỏ đi</button>
+      <button id="btnLeaveNo" class="secondary">Ở lại</button>
+    </div>
+  </div>
+  <div id="invitePop">
+    <div class="ov-box">
+      <div class="ov-title">Lời mời tỷ thí</div>
+      <div class="ov-reason" id="inviteText"></div>
+      <button id="btnInvYes">Nhận lời</button>
+      <button id="btnInvNo" class="secondary">Từ chối</button>
+    </div>
+  </div>
+  <div id="hall">
+    <div class="hall-top">
+      <button id="btnHallBack" class="secondary">← Trang chính</button>
+      <h2>Sảnh bàn cờ</h2>
+      <p class="hint" id="hallHint">Kéo trái/phải để chọn bàn.</p>
+    </div>
+    <div id="hallStrip"></div>
+  </div>
+  <div id="profPop">
+    <div class="ov-box">
+      <div class="ov-title" id="profName">Hồ sơ</div>
+      <div class="prof-av" id="profAv"></div>
+      <button id="btnProfUpload" class="secondary">Duyệt ảnh</button>
+      <button id="btnProfSave" class="secondary" disabled>Lưu ảnh</button>
+      <input type="file" id="fileProf" accept="image/*" hidden>
+      <div class="ov-reason" id="profStats"></div>
+      <button id="btnProfClose" class="secondary">Đóng</button>
+    </div>
+  </div>
+  <div id="overlay">
+    <div class="ov-box">
+      <div class="ov-title" id="ovTitle">Kết thúc</div>
+      <div class="ov-reason" id="ovReason"></div>
+      <div class="faces" id="ovFaces"></div>
+      <div class="ov-rank" id="ovRank"></div>
+      <button id="btnAgain">Chơi tiếp</button>
+    </div>
+  </div>
+  <audio id="audGame" loop preload="auto" src="/audio/spirit-song.mp3"></audio>
+  <audio id="audHome" loop preload="auto" src="/audio/lotus-dew.mp3"></audio>
+  <script src="/js/game.js"></script>
+  <script src="/js/net.js"></script>
+</body>
+</html>

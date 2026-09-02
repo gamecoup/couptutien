@@ -18,11 +18,14 @@
   #hall:not(.show) { display: none !important; }
   .time-wrap { position: relative; }
   #btnTime { margin: 0; padding: 0; font-size: .9rem; background: #3e2723; width: 40px; height: 40px; border-radius: 50%; }
+  .board-tools, .mid-tools, .left-col, .time-wrap { overflow: visible; }
   .time-pop {
-    display: none; position: absolute; left: 100%; top: 0; margin-left: 6px;
-    background: #2a1d12; border: 1px solid #5c4030; border-radius: 8px; padding: 6px; z-index: 8;
+    display: none; position: absolute; left: 0; top: 44px; margin-left: 0;
+    background: #2a1d12; border: 1px solid #5c4030; border-radius: 8px; padding: 6px; z-index: 30;
+    min-width: 120px;
   }
   .time-wrap.open .time-pop { display: block; }
+  .time-pop .mode { display: block; width: 100%; margin: 3px 0; }
   #readyGate {
     position: absolute; inset: 0;
     background: rgba(18,10,6,.45);
@@ -627,58 +630,105 @@
     }
     .board-row {
       flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-    .left-col {
-      width: 100%;
-      min-width: 0;
-      order: 2;
-      align-items: center;
-    }
-    .cap-stack {
-      flex-direction: row;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
+      width: 100%;
     }
-    .caps {
-      width: auto;
-      grid-template-columns: repeat(4, 28px);
-      grid-auto-rows: 28px;
+    .play-area {
+      display: grid;
+      width: 100%;
+      grid-template-columns: auto minmax(0, 1fr) 46px;
+      grid-template-rows: auto 1fr auto;
+      gap: 4px 4px;
+      align-items: stretch;
     }
-    .mini { width: 28px; height: 28px; font-size: 14px; }
-    .mid-tools {
-      flex: 0 0 auto;
-      min-height: 0;
-      align-items: center;
-    }
-    .spec-box {
-      width: 72px; height: 72px; min-height: 72px; font-size: 1.1rem;
-    }
-    .spec-box .spec-lab { font-size: .62rem; }
+    .left-col, .cap-stack, .mid-tools, .side-clocks { display: contents; }
     .board-stage {
-      order: 1;
+      grid-column: 2;
+      grid-row: 1 / 4;
       width: 100%;
       display: flex;
       justify-content: center;
     }
-    .play-area {
-      display: contents;
+    #capRed {
+      grid-column: 1;
+      grid-row: 1;
+      justify-self: start;
+      align-self: start;
     }
-    .side-clocks {
-      order: 3;
-      width: 100%;
-      min-width: 0;
-      flex-direction: row;
+    #capBlack {
+      grid-column: 2;
+      grid-row: 3;
+      justify-self: end;
+      align-self: end;
+    }
+    .caps {
+      width: auto;
+      grid-template-columns: repeat(3, 26px);
+      grid-auto-rows: 26px;
+      direction: ltr;
+    }
+    .mini { width: 26px; height: 26px; font-size: 13px; }
+    .side-clocks > .player:first-of-type {
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+      align-self: start;
+      max-width: 72px;
+    }
+    .side-clocks > .player:last-of-type {
+      grid-column: 1;
+      grid-row: 3;
+      justify-self: start;
+      align-self: end;
+      max-width: 72px;
+    }
+    .side-clocks.flip > .player:first-of-type {
+      grid-column: 1;
+      grid-row: 3;
+      justify-self: start;
+      align-self: end;
+    }
+    .side-clocks.flip > .player:last-of-type {
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+      align-self: start;
+    }
+    .board-tools, .spec-box, .side-actions, #gameWrap #btnHome {
+      grid-column: 3;
+    }
+    .board-tools {
+      grid-row: 1;
+      flex-direction: column;
       align-items: center;
-      justify-content: space-between;
-      gap: 6px;
+      gap: 4px;
     }
-    .side-clocks.flip { flex-direction: row-reverse; }
-    .player { max-width: 92px; }
-    .side-actions { width: auto; min-width: 110px; margin: 0; }
+    #gameWrap #btnHome {
+      position: static;
+      grid-row: 1;
+      align-self: end;
+      width: 36px; height: 36px;
+    }
+    .spec-box {
+      grid-row: 2;
+      align-self: center;
+      width: 42px; height: 42px; min-height: 42px;
+      font-size: .85rem; border-width: 3px;
+    }
+    .spec-box .spec-lab { font-size: .42rem; }
+    .side-actions {
+      grid-row: 3;
+      width: 46px;
+      min-width: 46px;
+      gap: 3px;
+    }
+    .side-actions > button, .chat-row, #btnChat, #btnQuick {
+      width: 46px; min-width: 46px; height: 28px;
+      font-size: .55rem; padding: 0;
+    }
+    .chat-row { flex-direction: column; height: auto; }
+    .time-pop { left: auto; right: 48px; top: 0; }
     #chatLog {
       order: 4;
       position: fixed;
@@ -705,6 +755,30 @@
     .ov-box button, #readyGate button, #drawAsk button, #leavePop button, #authPop button {
       min-width: 140px; min-height: 46px; font-size: 1.05rem; padding: 10px 16px;
     }
+    #home.show {
+      justify-content: flex-start;
+      overflow: auto;
+    }
+    .home-row {
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 58px 8px 12px;
+    }
+    .home-side {
+      width: min(340px, 94vw);
+      padding-top: 0;
+    }
+    .home-center { max-width: 94vw; }
+    .home-side #btnPlayNow { margin-top: 8px; }
+    #btnPlayNow { width: 88px; height: 88px; font-size: .9rem; }
+    #btnVsBot { width: min(340px, 92vw); padding: 8px; }
+    #btnVsBot .hero-art { font-size: 22px; }
+    #findBox input { width: 58%; }
+    #findList { max-height: 88px; }
+    #onlinePop { max-height: 120px; }
+    .home-av { width: 86px; height: 86px; }
     #hub .hub-row { gap: 20px; }
     .piece-btn { width: 150px; }
     .piece-btn .art { width: 128px; height: 128px; }

@@ -228,13 +228,18 @@ function renderModes() {
     const b = document.createElement("button");
     b.className = "mode" + (mode.id === timeMode.id ? " on" : "");
     b.textContent = mode.label;
-    b.onclick = function () {
-      if (!net.isHost) { addLog("Chỉ chủ phòng được đổi giờ."); return; }
-      if (lock) { addLog("Hủy sẵn sàng trước khi đổi giờ."); return; }
+    if (lock && !net.vsBot) b.disabled = true;
+    if (net.vsBot && started && state && !state.over) b.disabled = true;
+    b.onclick = function (ev) {
+      ev.stopPropagation();
+      if (!net.vsBot && !net.isHost) { addLog("Chỉ chủ phòng được đổi giờ."); return; }
+      if (!net.vsBot && lock) { addLog("Hủy sẵn sàng trước khi đổi giờ."); return; }
+      if (net.vsBot && started && state && !state.over) { addLog("Đang chơi với máy, không đổi giờ."); return; }
       timeMode = mode;
       clocks = {red: timeMode.gameMs, black: timeMode.gameMs, moveLeft: timeMode.moveMs};
       renderModes();
       paintClocks();
+      document.getElementById("timeWrap").classList.add("open");
       netSend({ type: "time", timeId: timeMode.id });
     };
     box.appendChild(b);
@@ -1485,14 +1490,8 @@ document.getElementById("btnStart").onclick = function () {
   this.style.display = "none";
 };
 document.getElementById("btnTime").onclick = function (ev) {
+  ev.preventDefault();
   ev.stopPropagation();
-  if (!net.isHost) { addLog("Chỉ chủ phòng được đổi giờ."); return; }
-  if (net.vsBot) {
-    if (started && state && !state.over) { addLog("Đang chơi với máy, không đổi giờ."); return; }
-    document.getElementById("timeWrap").classList.toggle("open");
-    return;
-  }
-  if (myReady || peerReady || started) { addLog("Hủy sẵn sàng trước khi đổi giờ."); return; }
   document.getElementById("timeWrap").classList.toggle("open");
 };
 document.addEventListener("click", function (ev) {
@@ -1622,8 +1621,8 @@ function openProfile(color) {
     "<br>Thắng: " + wr + "% · " + games + " ván (" + (st.wins||0) + " thắng)";
   const up = document.getElementById("btnProfUpload");
   const save = document.getElementById("btnProfSave");
-  up.style.display = mine ? "inline-block" : "none";
-  save.style.display = mine ? "inline-block" : "none";
+  up.style.display = "none";
+  save.style.display = "none";
   save.disabled = true;
   let pending = null;
   up.onclick = function () { document.getElementById("fileProf").click(); };

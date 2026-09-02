@@ -144,7 +144,6 @@ function applyScore(winner) {
     return "";
   }
   if (net.account && net.color) {
-    netSend({ type: "profile-save", pts: scores[net.color] || 0 });
   }
   if (!net.account) {
     paintRanks();
@@ -223,18 +222,27 @@ function renderModes() {
   const box = document.getElementById("modes");
   if (!box) return;
   box.innerHTML = "";
+  const readyGate = document.getElementById("readyGate");
+  const waitHint = document.getElementById("waitHint");
+  const botLobby = readyGate && readyGate.classList.contains("show") && waitHint &&
+    waitHint.textContent.indexOf("Có thể đổi giờ") !== -1;
+  const botMode = net.vsBot || net.room === "BOT" || botLobby;
   const lock = !net.isHost || myReady || peerReady || started;
+  const botLocked = botMode && started && state && !state.over &&
+    readyGate && !readyGate.classList.contains("show");
   TIME_MODES.forEach(mode => {
     const b = document.createElement("button");
     b.className = "mode" + (mode.id === timeMode.id ? " on" : "");
     b.textContent = mode.label;
-    if (lock && !net.vsBot) b.disabled = true;
-    if (net.vsBot && started && state && !state.over) b.disabled = true;
+    if (!isMobileUI() && lock && !botMode && !botLobby) b.disabled = true;
+    if (botLocked) b.disabled = true;
     b.onclick = function (ev) {
       ev.stopPropagation();
-      if (!net.vsBot && !net.isHost) { addLog("Chỉ chủ phòng được đổi giờ."); return; }
-      if (!net.vsBot && lock) { addLog("Hủy sẵn sàng trước khi đổi giờ."); return; }
-      if (net.vsBot && started && state && !state.over) { addLog("Đang chơi với máy, không đổi giờ."); return; }
+      const selectingBotTime = readyGate && readyGate.classList.contains("show") &&
+        waitHint && waitHint.textContent.indexOf("Có thể đổi giờ") !== -1;
+      if (!botMode && !selectingBotTime && !net.isHost) { addLog("Chỉ chủ phòng được đổi giờ."); return; }
+      if (!botMode && !selectingBotTime && lock) { addLog("Hủy sẵn sàng trước khi đổi giờ."); return; }
+      if (botLocked) { addLog("Đang chơi với máy, không đổi giờ."); return; }
       timeMode = mode;
       clocks = {red: timeMode.gameMs, black: timeMode.gameMs, moveLeft: timeMode.moveMs};
       renderModes();
@@ -297,8 +305,8 @@ function showLobby() {
   setStatus();
   paintClocks();
   draw();
-  netSend({ type: "busy", on: false });
-  if (net.room && net.isHost) relay({kind:"lobby"});
+  if (typeof netSend === "function") netSend({ type: "busy", on: false });
+  if (net.room && net.isHost && typeof relay === "function") relay({kind:"lobby"});
 }
 
 function startMatch(fromNet) {
@@ -477,6 +485,7 @@ function applyMoveBoard(board, mv) {
   nb[mv.fromR][mv.fromC] = null;
   const np = Object.assign({}, p);
   np.revealed = true;
+  if (mv.revealedType) np.type = mv.revealedType;
   nb[mv.toR][mv.toC] = np;
   return nb;
 }
@@ -817,8 +826,6 @@ let sfxOn = true;
 let musicOn = true;
 let sfxVol = 0.8;
 let musicVol = 0.4;
-let musicTimer = 0;
-let musicStep = 0;
 function loadAudioPref() {
   try {
     const a = JSON.parse(localStorage.getItem("coupAudio") || "{}");
@@ -955,31 +962,17 @@ function playCheckTune() {
     beep(ctx, f * 1.5, t0 + i * 0.09, 0.08, "sawtooth", 0.03);
   });
 }
-const BG_NOTES = [
-  294, 330, 392, 440, 392, 330, 294, 262,
-  294, 392, 440, 523, 440, 392, 330, 294,
-  262, 294, 330, 392, 349, 330, 262, 220
-];
 function pauseTrack(id) {
   const el = document.getElementById(id);
   if (!el) return;
   try { el.pause(); } catch (e) {}
 }
 function stopMusic() {
-  if (musicTimer) { clearInterval(musicTimer); musicTimer = 0; }
   pauseTrack("audGame");
 }
-const HOME_NOTES = [
-  440, 494, 587, 659, 587, 494, 440, 392,
-  370, 392, 440, 494, 440, 392, 330, 294,
-  262, 294, 330, 392, 440, 392, 330, 262
-];
 let homeMusicOn = true;
 let homeVol = 0.35;
-let homeTimer = 0;
-let homeStep = 0;
 function stopHomeMusic() {
-  if (homeTimer) { clearInterval(homeTimer); homeTimer = 0; }
   pauseTrack("audHome");
 }
 function stopTracks() {
@@ -989,57 +982,25 @@ function stopTracks() {
     try { el.pause(); el.currentTime = 0; } catch (e) {}
   });
 }
-function playFile(id, vol, onFail) {
+function playFile(id, vol) {
   const el = document.getElementById(id);
   if (!el || !el.getAttribute("src")) return false;
   el.volume = Math.max(0, Math.min(1, vol == null ? 0.4 : vol));
   el.loop = true;
-  const fail = function () { if (typeof onFail === "function") onFail(); };
-  el.onerror = fail;
-  const p = el.play();
-  if (p && p.catch) p.catch(fail);
+  el.play();
   return true;
 }
 function startHomeMusic() {
   stopHomeMusic();
   stopTracks();
   if (!homeMusicOn) return;
-  if (playFile("audHome", homeVol, function () { startHomeMusicProc(); })) return;
-}
-function startHomeMusicProc() {
-  const ctx = ensureAudio();
-  if (!ctx) return;
-  homeStep = 0;
-  homeTimer = setInterval(function () {
-    if (!homeMusicOn || !audioCtx) return;
-    const f = HOME_NOTES[homeStep % HOME_NOTES.length];
-    const t0 = audioCtx.currentTime;
-    beep(audioCtx, f, t0, 1.6, "sine", 0.055, homeVol);
-    beep(audioCtx, f * 2.01, t0 + 0.05, 1.2, "sine", 0.018, homeVol);
-    beep(audioCtx, f * 3.02, t0 + 0.08, 0.7, "triangle", 0.008, homeVol);
-    if (homeStep % 4 === 0) beep(audioCtx, f / 2, t0, 1.8, "sine", 0.02, homeVol);
-    homeStep++;
-  }, 900);
+  playFile("audHome", homeVol);
 }
 function startMusic() {
   stopMusic();
   stopTracks();
   if (!musicOn) return;
-  if (playFile("audGame", musicVol, function () { startMusicProc(); })) return;
-}
-function startMusicProc() {
-  const ctx = ensureAudio();
-  if (!ctx) return;
-  musicStep = 0;
-  musicTimer = setInterval(function () {
-    if (!musicOn || !audioCtx) return;
-    const f = BG_NOTES[musicStep % BG_NOTES.length];
-    const t0 = audioCtx.currentTime;
-    beep(audioCtx, f, t0, 0.95, "sine", 0.028, musicVol);
-    beep(audioCtx, f * 1.5, t0, 0.9, "sine", 0.012, musicVol);
-    beep(audioCtx, f / 2, t0, 1.05, "triangle", 0.014, musicVol);
-    musicStep++;
-  }, 720);
+  playFile("audGame", musicVol);
 }
 function playWinTune() {
   if (!sfxOn) return;
@@ -1296,7 +1257,11 @@ function showChat(who, txt) {
   if (log) {
     const line = document.createElement("div");
     line.className = "line";
-    line.innerHTML = "<span class='who'>" + who + ":</span> " + txt;
+    const whoEl = document.createElement("span");
+    whoEl.className = "who";
+    whoEl.textContent = who + ":";
+    line.appendChild(whoEl);
+    line.appendChild(document.createTextNode(" " + txt));
     log.appendChild(line);
     log.scrollTop = log.scrollHeight;
     if (isMobileUI()) {
@@ -1492,8 +1457,15 @@ document.getElementById("btnStart").onclick = function () {
 document.getElementById("btnTime").onclick = function (ev) {
   ev.preventDefault();
   ev.stopPropagation();
-  document.getElementById("timeWrap").classList.toggle("open");
+  const timeWrap = document.getElementById("timeWrap");
+  timeWrap.classList.toggle("open");
+  document.getElementById("soundWrap").classList.remove("open");
+  document.getElementById("chatWrap").classList.remove("open");
+  document.getElementById("quickWrap").classList.remove("open");
 };
+document.getElementById("modes").addEventListener("click", function (ev) {
+  ev.stopPropagation();
+});
 document.addEventListener("click", function (ev) {
   const tw = document.getElementById("timeWrap");
   if (tw && !ev.target.closest("#timeWrap")) tw.classList.remove("open");
@@ -1569,8 +1541,18 @@ function saveOwnAvatar(src) {
 function setAvatar(color, src) {
   const btn = document.getElementById(color === "red" ? "avRed" : "avBlack");
   if (!btn) return;
-  if (src) btn.innerHTML = '<img alt="" src="' + src + '">';
-  else btn.innerHTML = color === "red" ? '<span class="ph">🔴</span>' : '<span class="ph">⚫</span>';
+  btn.replaceChildren();
+  if (src) {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = src;
+    btn.appendChild(img);
+  } else {
+    const ph = document.createElement("span");
+    ph.className = "ph";
+    ph.textContent = color === "red" ? "🔴" : "⚫";
+    btn.appendChild(ph);
+  }
 }
 function paintSeats() {
   ["red", "black"].forEach(function (color) {

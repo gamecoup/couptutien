@@ -4,6 +4,7 @@ const path = require("path");
 const { WebSocketServer } = require("ws");
 const store = require("./lib/store");
 const oauth = require("./lib/oauth");
+const rules = require("./lib/rules");
 const otps = new Map();
 const sessions = new Map();
 const TIME = {
@@ -121,7 +122,14 @@ function findOrLinkOAuth(info) {
 
 const server = http.createServer((req, res) => {
   const rawUrl = req.url || "/";
-  const urlPath = decodeURIComponent(rawUrl.split("?")[0]);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(rawUrl.split("?")[0]);
+  } catch (e) {
+    res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("URL không hợp lệ");
+    return;
+  }
   const qs = new URLSearchParams(rawUrl.split("?")[1] || "");
 
   if (urlPath === "/auth/google" || urlPath === "/auth/facebook") {
@@ -197,7 +205,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ server, path: "/ws" });
+const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
 const rooms = new Map();
 store.ensureDir();
 function loadAcc() { return store.loadAcc(); }
@@ -226,6 +234,33 @@ function code() {
 function send(ws, obj) {
   if (!live(ws)) return;
   try { ws.send(JSON.stringify(obj)); } catch (e) {}
+}
+function visibleGame(game, color) {
+  if (!game) return null;
+  return {
+    board: game.board.map((row) => row.map((piece) => {
+      if (!piece) return null;
+      const copy = Object.assign({}, piece);
+      if (!copy.revealed && copy.color !== color) copy.type = copy.slot;
+      return copy;
+    })),
+    turn: game.turn,
+    over: !!game.over,
+    winner: game.winner || null,
+    ply: game.ply || 0,
+    captured: game.captured || { red: [], black: [] }
+  };
+}
+function sendGameSync(room) {
+  if (!room || !room.game) return;
+  room.players.forEach((p) => send(p.ws, {
+    type: "relay",
+    payload: { kind: "sync", game: visibleGame(room.game, p.color) }
+  }));
+  (room.specs || []).forEach((s) => send(s, {
+    type: "relay",
+    payload: { kind: "sync", game: visibleGame(room.game, null) }
+  }));
 }
 
 function pruneRoom(room) {
@@ -437,11 +472,22 @@ function assignColorsAndJoin(room, ws) {
 wss.on("connection", (ws) => {
   ws.roomId = null;
   ws.isAlive = true;
+  ws.messageWindow = { at: Date.now(), count: 0 };
   issueSession(ws);
   send(ws, { type: "session", token: ws.token });
   ws.on("pong", () => { ws.isAlive = true; });
 
   ws.on("message", (raw) => {
+    if (raw.length > 64 * 1024) {
+      send(ws, { type: "error", text: "Dữ liệu gửi quá lớn." });
+      return;
+    }
+    const now = Date.now();
+    if (now - ws.messageWindow.at >= 10000) ws.messageWindow = { at: now, count: 0 };
+    if (++ws.messageWindow.count > 120) {
+      send(ws, { type: "error", text: "Gửi quá nhanh. Vui lòng thử lại sau." });
+      return;
+    }
     let msg;
     try { msg = JSON.parse(String(raw)); } catch (e) { return; }
 
@@ -468,7 +514,7 @@ wss.on("connection", (ws) => {
       if (found) {
         send(ws, { type: "joined", room: found.room.id, color: found.color, count: found.room.players.length });
         if (found.room.busy && found.room.clocks) {
-          send(ws, { type: "resume-game", clocks: found.room.clocks, turn: found.room.turn, timeId: found.room.timeId || 3 });
+          send(ws, { type: "resume-game", clocks: found.room.clocks, turn: found.room.turn, timeId: found.room.timeId || 3, game: visibleGame(found.room.game, found.color) });
         }
         seat(found.room);
       }
@@ -601,6 +647,7 @@ wss.on("connection", (ws) => {
       }
       br.busy = true;
       br.over = false;
+      br.game = null;
       initClocks(br);
       br.players.forEach((p) => { p.ready = false; });
       br.players.forEach((p) => send(p.ws, { type: "start", clocks: br.clocks, turn: br.turn }));
@@ -730,8 +777,6 @@ wss.on("connection", (ws) => {
           acc.avatarAt = Date.now();
         }
       }
-      if (msg.stats) acc.stats = msg.stats;
-      if (typeof msg.pts === "number") acc.pts = msg.pts;
       if (msg.name) {
         const next = String(msg.name).trim().slice(0, 16);
         if (next && next !== acc.name) {
@@ -800,7 +845,10 @@ wss.on("connection", (ws) => {
       const accs = loadAcc();
       const acc = accs.find((a) => a.contact === contact);
       if (!acc) return;
-      acc.pass = hashPass(msg.pass);
+      const nextPass = hashPass(msg.pass);
+      delete acc.pass;
+      acc.salt = nextPass.salt;
+      acc.hash = nextPass.hash;
       saveAcc(accs);
       otps.delete(contact);
       send(ws, { type: "error", text: "Đã tạo mật khẩu mới. Hãy đăng nhập." });
@@ -945,14 +993,41 @@ wss.on("connection", (ws) => {
     if (msg.type === "busy") { room.busy = !!msg.on; broadcastList(); }
     if (msg.type === "relay") {
       const pld = msg.payload || {};
+      const player = room.players.find((p) => p.ws === ws);
+      let revealedType = null;
+      if (!player || ws.spectate) return;
+      if (pld.kind === "sync") {
+        if (!player.host || room.game || !pld.game || !rules.validInitialBoard(pld.game.board, room.variant || "up")) return;
+        room.game = rules.createSecretGame(pld.game.board, room.variant || "up", pld.game.turn);
+        room.turn = room.game.turn;
+        sendGameSync(room);
+        return;
+      }
+      if (!["sync", "move", "finish", "chat", "draw-ask", "draw-yes", "draw-no", "draw-cancel", "profile"].includes(pld.kind)) return;
       if (pld.kind === "move" && room.busy && room.clocks) {
+        if (room.over || room.turn !== player.color) return;
+        const checked = rules.validateMove(room.game, pld.mv, player.color, room.variant || "up");
+        if (!checked.ok) {
+          send(ws, { type: "error", text: checked.reason });
+          return;
+        }
         const tm = TIME[room.timeId || 3] || TIME[3];
+        const moved = room.game.board[pld.mv.fromR][pld.mv.fromC];
+        revealedType = moved && moved.type;
+        rules.applyMove(room.game, pld.mv);
         room.turn = room.turn === "red" ? "black" : "red";
         room.clocks.moveLeft = tm.move;
         room.lastTick = Date.now();
+        if (!rules.hasLegalMove(room.game, room.turn, room.variant || "up")) {
+          room.game.over = true;
+          finishRoom(room, player.color, rules.inCheck(room.game.board, room.turn, room.variant || "up") ? "Chiếu bí" : "Hết nước đi");
+          return;
+        }
       }
+      if (pld.kind === "move" && !room.game) return;
+      if (pld.kind === "move") pld = { kind: "move", mv: pld.mv, revealedType: revealedType };
       if (pld.kind === "finish") {
-        if (ws.spectate) return;
+        if (!room.busy || room.over || !pld.winner || !["red", "black", "draw"].includes(pld.winner)) return;
         finishRoom(room, pld.winner, pld.reason || "Kết thúc");
         return;
       }

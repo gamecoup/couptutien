@@ -1,5 +1,10 @@
 /* net.js — phòng chơi WebSocket */
 var pendingAuth = null;
+function escapeNetHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch];
+  });
+}
 function netUrl() {
   var proto = location.protocol === "https:" ? "wss://" : "ws://";
   var host = location.host || "localhost:8080";
@@ -127,7 +132,11 @@ function onNetMsg(ev) {
       var tmg = TIME_MODES.find(function (m) { return m.id === msg.timeId; });
       if (tmg) timeMode = tmg;
     }
-    started = true;
+    if (msg.game && msg.game.board) {
+      importGame({ board: msg.game.board, turn: msg.turn, over: false, winner: null,
+        ply: msg.game.ply || 0, captured: msg.game.captured || { red: [], black: [] },
+        clocks: msg.clocks, timeId: msg.timeId, started: true });
+    } else started = true;
     document.getElementById("readyGate").classList.remove("show");
     if (typeof startTick === "function") startTick();
     goTable();
@@ -376,7 +385,7 @@ function renderOnline(list, n) {
     var row = document.createElement("div");
     row.className = "on-row";
     var st = u.busy ? "đang đấu" : (u.room ? "trong bàn" : "rảnh");
-    row.innerHTML = "<span>" + (u.name || "Đạo hữu") + " · " + st + "</span>";
+    row.innerHTML = "<span>" + escapeNetHtml(u.name || "Đạo hữu") + " · " + escapeNetHtml(st) + "</span>";
     if (u.id && u.id === net.myId) return;
     if (!u.busy && u.id && net.account && u.logged) {
       var b = document.createElement("button");
@@ -408,8 +417,8 @@ function renderHall(tables) {
     d.className = "tbl" + (t.id === net.room ? " mine" : "");
     var st = t.busy ? "Đang chơi" : (t.n < 2 ? "Đang chờ" : "Đủ 2 người");
     if (t.lock) st += " · có mật khẩu";
-    d.innerHTML = "<div class='tid'>" + t.id + "</div><div class='st'>" + st +
-      "</div><div class='st'>" + t.n + "/2 người" + (t.specs ? " · xem " + t.specs : "") + "</div>";
+    d.innerHTML = "<div class='tid'>" + escapeNetHtml(t.id) + "</div><div class='st'>" + escapeNetHtml(st) +
+      "</div><div class='st'>" + escapeNetHtml(t.n + "/2 người" + (t.specs ? " · xem " + t.specs : "")) + "</div>";
     if (t.id !== net.room) {
       var b = document.createElement("button");
       b.textContent = t.n < 2 ? (t.lock ? "Nhập mật khẩu" : "Vào chơi") : "Vào xem";
@@ -518,7 +527,7 @@ function renderFind(list) {
     row.className = "find-row";
     var extra = u.via ? (" · " + u.via) : "";
     var st = u.online === false ? " · offline" : (u.busy ? " · đang đấu" : u.room ? " · trong bàn" : " · rảnh");
-    row.innerHTML = "<span>" + u.name + extra + st + "</span>";
+    row.innerHTML = "<span>" + escapeNetHtml(u.name) + escapeNetHtml(extra + st) + "</span>";
     var b = document.createElement("button");
     b.textContent = "Mời";
     b.disabled = !!u.busy;

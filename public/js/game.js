@@ -27,11 +27,21 @@ var peerReady = false;
 const overlay = document.getElementById("overlay");
 
 let W, H, MARGIN, CELL;
+function isMobileUI() {
+  return window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
+}
 function layout() {
-  const side = 420;
-  const byW = window.innerWidth - side;
-  const byH = (window.innerHeight - 48) * 640 / 720;
-  const maxW = Math.max(260, Math.min(500, byW, byH));
+  let maxW;
+  if (isMobileUI()) {
+    const byW = window.innerWidth - 12;
+    const byH = (window.innerHeight - 210) * 640 / 720;
+    maxW = Math.max(220, Math.min(byW, byH));
+  } else {
+    const side = 420;
+    const byW = window.innerWidth - side;
+    const byH = (window.innerHeight - 48) * 640 / 720;
+    maxW = Math.max(260, Math.min(500, byW, byH));
+  }
   canvas.width = maxW;
   canvas.height = maxW * 720 / 640;
   W = canvas.width; H = canvas.height;
@@ -318,6 +328,45 @@ function startMatch(fromNet) {
 }
 
 function walkAs(p) { return p.revealed ? p.type : p.slot; }
+function isTuongMode() {
+  return typeof net !== "undefined" && net.variant === "tuong";
+}
+function movesAdvisorTuong(color, c, r, push) {
+  const steps = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  for (let i = 0; i < steps.length; i++) {
+    const nc = c + steps[i][0], nr = r + steps[i][1];
+    if (!palace(color, nc, nr)) continue;
+    push(nc, nr);
+  }
+}
+function movesAdvisorUp(piece, color, c, r, push) {
+  const steps = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  for (let i = 0; i < steps.length; i++) {
+    const nc = c + steps[i][0], nr = r + steps[i][1];
+    if (!piece.revealed && !palace(color, nc, nr)) continue;
+    push(nc, nr);
+  }
+}
+function movesElephantTuong(board, color, c, r, push) {
+  const steps = [[2,2],[2,-2],[-2,2],[-2,-2]];
+  for (let i = 0; i < steps.length; i++) {
+    const dc = steps[i][0], dr = steps[i][1];
+    if (at(board, c + dc / 2, r + dr / 2)) continue;
+    const nc = c + dc, nr = r + dr;
+    if (!inBoard(nc, nr)) continue;
+    const home = color === "red" ? nr <= 4 : nr >= 5;
+    if (!home) continue;
+    push(nc, nr);
+  }
+}
+function movesElephantUp(board, color, c, r, push) {
+  const steps = [[2,2],[2,-2],[-2,2],[-2,-2]];
+  for (let i = 0; i < steps.length; i++) {
+    const dc = steps[i][0], dr = steps[i][1];
+    if (at(board, c + dc / 2, r + dr / 2)) continue;
+    push(c + dc, r + dr);
+  }
+}
 
 function rawMoves(board, c, r) {
   const p = board[r][c];
@@ -348,28 +397,13 @@ function rawMoves(board, c, r) {
     return out;
   }
   if (kind === "A") {
-    const steps = [[1,1],[1,-1],[-1,1],[-1,-1]];
-    for (let i = 0; i < steps.length; i++) {
-      const nc = c + steps[i][0], nr = r + steps[i][1];
-      if (!inBoard(nc, nr)) continue;
-      if (!p.revealed && kind === "A" && !palace(color, nc, nr)) continue;
-      push(nc, nr);
-    }
+    if (isTuongMode()) movesAdvisorTuong(color, c, r, push);
+    else movesAdvisorUp(p, color, c, r, push);
     return out;
   }
   if (kind === "E") {
-    const steps = [[2,2],[2,-2],[-2,2],[-2,-2]];
-    for (let i = 0; i < steps.length; i++) {
-      const dc = steps[i][0], dr = steps[i][1];
-      if (at(board, c + dc / 2, r + dr / 2)) continue;
-      const nc = c + dc, nr = r + dr;
-      if (!inBoard(nc, nr)) continue;
-      if (!p.revealed) {
-        const home = color === "red" ? nr <= 4 : nr >= 5;
-        if (!home) continue;
-      }
-      push(nc, nr);
-    }
+    if (isTuongMode()) movesElephantTuong(board, color, c, r, push);
+    else movesElephantUp(board, color, c, r, push);
     return out;
   }
   if (kind === "H") {
@@ -1236,9 +1270,13 @@ document.getElementById("volSfx").oninput = function () {
 };
 const EMO = ["😄","😂","😎","😮","😡","😭","👍","👏","🔥","🐔","❤️","🤝"];
 let chatHideTimer = 0;
+let chatLogHideTimer = 0;
 function clearChatLog() {
   const log = document.getElementById("chatLog");
-  if (log) log.innerHTML = "";
+  if (log) {
+    log.innerHTML = "";
+    log.classList.remove("show-log");
+  }
   const toast = document.getElementById("chatToast");
   if (toast) { toast.classList.remove("show"); toast.textContent = ""; }
 }
@@ -1256,6 +1294,11 @@ function showChat(who, txt) {
     line.innerHTML = "<span class='who'>" + who + ":</span> " + txt;
     log.appendChild(line);
     log.scrollTop = log.scrollHeight;
+    if (isMobileUI()) {
+      log.classList.add("show-log");
+      clearTimeout(chatLogHideTimer);
+      chatLogHideTimer = setTimeout(function () { log.classList.remove("show-log"); }, 6000);
+    }
   }
 }
 function sendChat(txt) {

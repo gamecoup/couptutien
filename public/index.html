@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
 <title>Cờ Úp Tu Tiên</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -11,6 +11,7 @@
     <div class="wrap">
       <button id="btnHome" class="secondary" title="Về trang chính">↩</button>
       <div class="board-row">
+        <div class="play-area">
         <div class="left-col">
           <div class="cap-stack">
             <div class="caps" id="capRed" title="Đỏ ăn được"></div>
@@ -54,7 +55,6 @@
             </div>
           </div>
         </div>
-        <div class="right-pane">
         <div class="side-clocks">
           <div class="player">
             <div class="av-wrap" id="wrapRed">
@@ -107,8 +107,8 @@
             <div class="rank-box" id="rankBlack"></div>
           </div>
         </div>
-        <div id="chatLog"></div>
         </div>
+        <div id="chatLog"></div>
       </div>
     </div>
     <div class="status" id="status" hidden></div>

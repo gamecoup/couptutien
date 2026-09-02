@@ -291,6 +291,13 @@ function connectNet(cb) {
     document.getElementById("netHint").textContent = "Lỗi kết nối. Chạy server rồi mở http://localhost:8080";
   };
 }
+function goLogin() {
+  hideHall();
+  document.getElementById("hub").classList.remove("show");
+  document.getElementById("home").classList.remove("show");
+  document.getElementById("gameWrap").classList.remove("show");
+  document.getElementById("loginGate").classList.add("show");
+}
 function goHub() {
   hideHall();
   document.getElementById("home").classList.remove("show");
@@ -802,6 +809,7 @@ function showInvite(msg) {
   document.getElementById("btnPickUp").onclick = function () { openMode("up"); };
   document.getElementById("btnPickTuong").onclick = function () { openMode("tuong"); };
   document.getElementById("btnBackHub").onclick = function () { goHub(); };
+  document.getElementById("btnHubLogin").onclick = function () { goLogin(); };
   function reallyLeave(lost) {
     if (typeof playDoor === "function") playDoor();
     if (lost && started && state && !state.over && net.color) {

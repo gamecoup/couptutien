@@ -1,0 +1,14 @@
+services:
+  coup:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DATA_DIR: /app/data
+    volumes:
+      - coup-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  coup-data:

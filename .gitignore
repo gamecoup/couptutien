@@ -1,6 +1,7 @@
 accounts.json
 data/
 node_modules/
+npm-start-*.txt
 .env
 .env.*
 !.env.example

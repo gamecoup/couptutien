@@ -1,0 +1,14 @@
+{
+  "name": "co-up-online",
+  "version": "1.0.0",
+  "description": "Cờ Úp 2 người chơi online",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "nodemailer": "^9.1.1",
+    "ws": "^8.18.0"
+  }
+}

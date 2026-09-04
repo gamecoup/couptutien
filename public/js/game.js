@@ -51,6 +51,8 @@ function layout() {
 layout();
 
 let state, selected, hints, history = [];
+let lastMove = null, lastMoveTime = 0;
+const LAST_MOVE_GLOW_MS = 5000;
 let timeMode = TIME_MODES[0];
 let clocks = null;
 let lastTick = 0;
@@ -58,10 +60,15 @@ let tickId = 0;
 let started = false;
 let nextFirst = null;
 let pendingDraw = null;
-var net = {ws:null, room:null, color:null, isHost:false, online:true, spectate:false, blockInvite:false};
+var net = {ws:null, room:null, color:null, isHost:false, online:true, spectate:false, blockInvite:false, botLevel:"normal"};
 var drawUsedPly = -1;
 var moveLock = false;
 var resignPending = false;
+var botTimer = null;
+// Hủy nước đi hẹn giờ của bot còn treo lại, tránh việc nó tự đánh vào ván mới sau khi rời bàn.
+function cancelBotTimer() {
+  if (botTimer) { clearTimeout(botTimer); botTimer = null; }
+}
 function relay(payload) {
   if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify({type:"relay", payload:payload}));
 }
@@ -289,6 +296,7 @@ function renderModes() {
 function resetBoard() {
   hideOverlay();
   stopTick();
+  cancelBotTimer();
   const board = emptyBoard();
   function place(color, flipR) {
     const bag = shuffle(BAG);
@@ -308,6 +316,7 @@ function resetBoard() {
   place("black", r => 9 - r);
   state = {board, turn: nextFirst || "red", over:false, winner:null, ply:0, reason:null, captured:{red:[], black:[]}, quietPly:0, trace:[]};
   selected = null; hints = []; history = [];
+  lastMove = null; lastMoveTime = 0;
   clocks = {red: timeMode.gameMs, black: timeMode.gameMs, moveLeft: timeMode.moveMs};
   lastTick = performance.now();
   paintCaptures();
@@ -375,7 +384,10 @@ function startMatch(fromNet) {
   netSend({ type: "busy", on: true });
   if (!fromNet && net.isHost) relay({kind:"sync", game: exportGame()});
   if (typeof updateReadyUI === "function") updateReadyUI();
-  if (net.vsBot && state && !state.over && state.turn !== net.color) setTimeout(botPlay, 500);
+  if (net.vsBot && state && !state.over && state.turn !== net.color) {
+    cancelBotTimer();
+    botTimer = setTimeout(botPlay, 500);
+  }
 }
 
 function walkAs(p) { return p.revealed ? p.type : p.slot; }
@@ -711,11 +723,13 @@ function onTick(now) {
     return;
   }
   paintClocks();
-  if (started && !state.over && inCheck(state.board, state.turn)) draw();
+  const glowing = lastMove && (now - lastMoveTime < LAST_MOVE_GLOW_MS);
+  if (started && !state.over && (inCheck(state.board, state.turn) || glowing)) draw();
 }
 
 function finish(winner, reason, fromNet) {
   if (state.over) return;
+  cancelBotTimer();
   resignPending = false;
   document.getElementById("btnResign").disabled = false;
   state.over = true;
@@ -755,6 +769,8 @@ function applyMove(mv, fromNet, extra) {
   const cap = state.board[mv.toR][mv.toC];
   const asWhat = walkAs(p);
   state.board = applyMoveBoard(state.board, mv);
+  lastMove = {fromC: mv.fromC, fromR: mv.fromR, toC: mv.toC, toR: mv.toR, color: p.color};
+  lastMoveTime = performance.now();
   const nowP = state.board[mv.toR][mv.toC];
   if (extra.revealedType && nowP) nowP.type = extra.revealedType;
   let msg = (p.color === "red" ? "Đỏ" : "Đen") + " " + sqName(mv.fromC, mv.fromR) + "→" + sqName(mv.toC, mv.toR);
@@ -809,29 +825,158 @@ function applyMove(mv, fromNet, extra) {
   if (inCheck(state.board, state.turn)) playCheckTune();
   if (net.online && !fromNet && !net.vsBot) relay({kind:"move", mv: mv});
   if (net.vsBot && !state.over && state.turn !== net.color) {
-    setTimeout(botPlay, 380);
+    cancelBotTimer();
+    botTimer = setTimeout(botPlay, 380);
   }
 }
-const BOT_VAL = {K:1000, R:90, C:45, H:40, E:22, A:20, P:10};
+const BOT_LEVELS = {
+  normal: { label: "Trúc Cơ", depth: 5,  timeMs: 700,  mistakeChance: 0.12 },
+  hard:   { label: "Kim Đan", depth: 7,  timeMs: 1500, mistakeChance: 0 },
+  master: { label: "Hóa Thần", depth: 10, timeMs: 3000, mistakeChance: 0 }
+};
+const BOT_PIECE_VAL = {K:10000, R:900, C:450, H:400, E:200, A:200, P:100};
+function botPseudoMobility(board, color) {
+  let n = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) {
+      const p = board[r][c];
+      if (p && p.color === color) n += rawMoves(board, c, r).length;
+    }
+  return n;
+}
+function botEvaluate(board, color) {
+  const opp = color === "red" ? "black" : "red";
+  let score = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) {
+      const p = board[r][c];
+      if (!p) continue;
+      let v = BOT_PIECE_VAL[p.type] || 0;
+      if (p.type === "P" && crossedRiver(p.color, r)) v += 90;
+      if (p.type === "H" || p.type === "C") v += (4 - Math.abs(c - 4)) * 3;
+      if (p.type === "R") v += (4 - Math.abs(c - 4)) * 2;
+      // hidden strong piece keeps human opponent guessing: small deception bonus
+      if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) v += 12;
+      score += (p.color === color) ? v : -v;
+    }
+  score += (botPseudoMobility(board, color) - botPseudoMobility(board, opp)) * 2;
+  return score;
+}
+function botMoveKey(m) { return m.fromC + "," + m.fromR + ">" + m.toC + "," + m.toR; }
+function botOrderMoves(board, moves, ttMove) {
+  const ttKey = ttMove ? botMoveKey(ttMove) : null;
+  return moves.slice().sort(function (a, b) {
+    return botMoveScore(board, b, ttKey) - botMoveScore(board, a, ttKey);
+  });
+}
+function botMoveScore(board, m, ttKey) {
+  if (ttKey && botMoveKey(m) === ttKey) return 1e6;
+  const cap = board[m.toR][m.toC];
+  if (!cap) return 0;
+  const att = board[m.fromR][m.fromC];
+  return 1000 + (BOT_PIECE_VAL[cap.type] || 0) * 10 - (BOT_PIECE_VAL[att.type] || 0);
+}
+let botTT, botNodes, botDeadline, botTimeUp;
+function botTimeCheck() {
+  botNodes++;
+  if ((botNodes & 1023) === 0 && Date.now() > botDeadline) botTimeUp = true;
+  return botTimeUp;
+}
+function botQuiesce(board, alpha, beta, color) {
+  if (botTimeCheck()) return 0;
+  const standPat = botEvaluate(board, color);
+  if (standPat >= beta) return beta;
+  if (standPat > alpha) alpha = standPat;
+  const opp = color === "red" ? "black" : "red";
+  const moves = allLegal(board, color).filter(function (m) { return !!board[m.toR][m.toC]; });
+  const ordered = botOrderMoves(board, moves, null);
+  for (let i = 0; i < ordered.length; i++) {
+    const nb = applyMoveBoard(board, ordered[i]);
+    const val = -botQuiesce(nb, -beta, -alpha, opp);
+    if (botTimeUp) return alpha;
+    if (val >= beta) return beta;
+    if (val > alpha) alpha = val;
+  }
+  return alpha;
+}
+function botNegamax(board, depth, alpha, beta, color, ply) {
+  if (botTimeCheck()) return 0;
+  const opp = color === "red" ? "black" : "red";
+  if (!findKing(board, color)) return -9000 + ply;
+  if (!findKing(board, opp)) return 9000 - ply;
+  const key = boardKey(board, color) + "#" + depth;
+  const tt = botTT.get(key);
+  let ttMove = null;
+  const origAlpha = alpha;
+  if (tt) {
+    ttMove = tt.move;
+    if (tt.depth >= depth) {
+      if (tt.flag === 0) return tt.score;
+      if (tt.flag === 1 && tt.score > alpha) alpha = tt.score;
+      else if (tt.flag === -1 && tt.score < beta) beta = tt.score;
+      if (alpha >= beta) return tt.score;
+    }
+  }
+  if (depth <= 0) return botQuiesce(board, alpha, beta, color);
+  const moves = allLegal(board, color);
+  if (!moves.length) return -9000 + ply; // no legal move = loss under this ruleset
+  const ordered = botOrderMoves(board, moves, ttMove);
+  let best = -Infinity, bestMove = null;
+  for (let i = 0; i < ordered.length; i++) {
+    const m = ordered[i];
+    const nb = applyMoveBoard(board, m);
+    const val = -botNegamax(nb, depth - 1, -beta, -alpha, opp, ply + 1);
+    if (botTimeUp) return best === -Infinity ? 0 : best;
+    if (val > best) { best = val; bestMove = m; }
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) break;
+  }
+  let flag = 0;
+  if (best <= origAlpha) flag = -1;
+  else if (best >= beta) flag = 1;
+  botTT.set(key, {depth: depth, score: best, move: bestMove, flag: flag});
+  return best;
+}
+function botChooseMove(board, color, level) {
+  const rootMoves = allLegal(board, color);
+  if (!rootMoves.length) return null;
+  botTT = new Map();
+  botNodes = 0; botTimeUp = false;
+  botDeadline = Date.now() + Math.max(150, level.timeMs || 700);
+  const opp = color === "red" ? "black" : "red";
+  let bestMove = rootMoves[0], ttMove = null;
+  for (let depth = 1; depth <= (level.depth || 5); depth++) {
+    let alpha = -Infinity, beta = Infinity;
+    let localBest = null, localScore = -Infinity;
+    const ordered = botOrderMoves(board, rootMoves, ttMove);
+    let timedOut = false;
+    for (let i = 0; i < ordered.length; i++) {
+      const m = ordered[i];
+      const nb = applyMoveBoard(board, m);
+      const val = -botNegamax(nb, depth - 1, -beta, -alpha, opp, 1);
+      if (botTimeUp) { timedOut = true; break; }
+      if (val > localScore) { localScore = val; localBest = m; }
+      if (localScore > alpha) alpha = localScore;
+    }
+    if (timedOut || !localBest) break;
+    bestMove = localBest; ttMove = localBest;
+    if (Date.now() > botDeadline) break;
+  }
+  if (level.mistakeChance && Math.random() < level.mistakeChance) {
+    return rootMoves[Math.floor(Math.random() * rootMoves.length)];
+  }
+  return bestMove;
+}
 function botPlay() {
+  botTimer = null;
   if (!net.vsBot || !state || state.over) return;
   const color = state.turn;
   if (net.color && color === net.color) return;
-  const moves = allLegal(state.board, color);
-  if (!moves.length) return;
-  let best = [];
-  let bestS = -1e9;
-  moves.forEach(function (m) {
-    const cap = state.board[m.toR][m.toC];
-    let s = Math.random() * 6;
-    if (cap) s += (BOT_VAL[cap.type] || 12) + 20;
-    const nb = applyMoveBoard(state.board, m);
-    if (inCheck(nb, color === "red" ? "black" : "red")) s += 18;
-    if (inCheck(nb, color)) s -= 80;
-    if (s > bestS) { bestS = s; best = [m]; }
-    else if (Math.abs(s - bestS) < 0.01) best.push(m);
-  });
-  const pick = best[Math.floor(Math.random() * best.length)] || moves[0];
+  const level = BOT_LEVELS[net.botLevel] || BOT_LEVELS.normal;
+  let timeMs = level.timeMs;
+  if (clocks && typeof clocks.moveLeft === "number") timeMs = Math.max(150, Math.min(timeMs, clocks.moveLeft * 0.6));
+  const pick = botChooseMove(state.board, color, {depth: level.depth, timeMs: timeMs, mistakeChance: level.mistakeChance});
+  if (!pick) return;
   applyMove(pick, true);
 }
 
@@ -1204,10 +1349,34 @@ function drawPiece(p, c, r, checkedKing) {
     ctx.lineWidth = 3;
     ctx.stroke();
   }
+  const lmElapsed = lastMove ? performance.now() - lastMoveTime : Infinity;
+  const isLastMoveTarget = lastMove && lmElapsed < LAST_MOVE_GLOW_MS && lastMove.toC === c && lastMove.toR === r;
+  let fade = 0, pulse = 0;
+  if (isLastMoveTarget) {
+    // Nước đi mới nhất: viền vàng phát sáng nhấp nháy, mờ dần về cuối thời gian hiển thị.
+    fade = 1 - lmElapsed / LAST_MOVE_GLOW_MS;
+    pulse = 0.5 + 0.5 * Math.sin(performance.now() / 200);
+    ctx.save();
+    ctx.shadowColor = "rgba(255,193,7," + (0.85 * fade) + ")";
+    ctx.shadowBlur = 8 + 10 * pulse * fade;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,179,0," + ((0.55 + 0.4 * pulse) * fade) + ")";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.beginPath();
   ctx.arc(x, y, rad, 0, Math.PI * 2);
   ctx.fillStyle = p.revealed ? "#f7ecd0" : "#5a3514";
   ctx.fill();
+  if (isLastMoveTarget) {
+    // Bản thân quân cờ nhấp nháy ánh vàng, không che chữ bên dưới.
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,193,7," + (0.4 + 0.35 * pulse) * fade + ")";
+    ctx.fill();
+  }
   if (p.revealed) {
     ctx.font = "400 " + (rad * 1.28) + 'px "KaiTi","STKaiti","FangSong","Songti SC",serif';
     ctx.textAlign = "center";
@@ -1217,9 +1386,34 @@ function drawPiece(p, c, r, checkedKing) {
     ctx.fillText(ch, x, y + 0.4);
   }
 }
+function drawLastMoveHighlight(lmElapsed) {
+  const fade = 1 - lmElapsed / LAST_MOVE_GLOW_MS;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
+  const sqs = [
+    {c: lastMove.fromC, r: lastMove.fromR, k: 0.85},
+    {c: lastMove.toC, r: lastMove.toR, k: 1}
+  ];
+  for (let i = 0; i < sqs.length; i++) {
+    const sq = sqs[i];
+    const x = MARGIN + viewC(sq.c) * CELL, y = MARGIN + viewR(sq.r) * CELL, rad = CELL * 0.47;
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,193,7," + (0.16 + 0.14 * pulse) * fade * sq.k + ")";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,152,0," + (0.55 + 0.35 * pulse) * fade * sq.k + ")";
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+  }
+}
 function draw() {
   if (!state) return;
   drawBoard();
+  const lmElapsed = lastMove ? performance.now() - lastMoveTime : Infinity;
+  if (lastMove && lmElapsed < LAST_MOVE_GLOW_MS) {
+    drawLastMoveHighlight(lmElapsed);
+  }
   if (selected) {
     const x = MARGIN + viewC(selected.c) * CELL, y = MARGIN + viewR(selected.r) * CELL;
     ctx.beginPath(); ctx.arc(x, y, CELL * 0.42, 0, Math.PI * 2);
@@ -1472,21 +1666,26 @@ function updateReadyUI() {
   const btn = document.getElementById("btnReady");
   const start = document.getElementById("btnStart");
   const hint = document.getElementById("waitHint");
+  const botBox = document.getElementById("botLevels");
   if (isBotTable()) {
     if (gameInPlay()) {
       gate.classList.remove("show");
       hideStartButton();
       renderModes();
+      if (botBox) botBox.classList.remove("show");
       return;
     }
     gate.classList.add("show");
-    hint.textContent = "Bạn là chủ bàn. Có thể đổi giờ, rồi bấm Bắt đầu.";
+    hint.textContent = "Bạn là chủ bàn. Chọn độ khó rồi bấm Bắt đầu.";
     btn.style.display = "none";
     start.style.display = "inline-block";
     start.textContent = "Bắt đầu";
+    if (botBox) botBox.classList.add("show");
+    renderBotLevels();
     renderModes();
     return;
   }
+  if (botBox) botBox.classList.remove("show");
   if (net.spectate) {
     gate.classList.add("show");
     hint.textContent = "Bạn đang xem bàn " + (net.room || "") + ". Chỉ chat, không đi cờ.";
@@ -1527,6 +1726,22 @@ document.getElementById("btnReady").onclick = function () {
   netSend({ type: "ready", on: myReady });
   updateReadyUI();
 };
+function renderBotLevels() {
+  const box = document.getElementById("botLevels");
+  if (!box) return;
+  const locked = gameInPlay();
+  Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) {
+    b.classList.toggle("on", b.dataset.level === (net.botLevel || "normal"));
+    b.disabled = locked;
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll("#botLevels button"), function (b) {
+  b.onclick = function () {
+    if (gameInPlay()) return;
+    net.botLevel = b.dataset.level;
+    renderBotLevels();
+  };
+});
 document.getElementById("btnStart").onclick = function () {
   hideStartButton();
   if (isBotTable()) {

@@ -542,6 +542,13 @@
   .gate-box h2 { margin: 0 0 10px; color: #ffe082; }
   .gate-box .modes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
   .gate-box .hint { color: #d7c4a3; font-size: .82rem; margin: 10px 0 14px; line-height: 1.4; }
+  #botLevels { display: none; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 10px; }
+  #botLevels.show { display: flex; }
+  #botLevels button {
+    min-width: 0; min-height: 0; margin: 0; padding: 7px 12px;
+    font-size: .82rem; border-radius: 8px; background: #3e2723;
+  }
+  #botLevels button.on { background: #2e7d32; }
   #btnReady { background: #2e7d32; font-size: 1rem; padding: 10px 22px; }
   .legend { font-size: .78rem; color: #d7c4a3; margin-top: 8px; line-height: 1.45; }
   .clock {

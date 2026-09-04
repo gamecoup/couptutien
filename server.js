@@ -280,13 +280,25 @@ function sendGameSync(room) {
   }));
 }
 
+// Thời gian chờ hồi kết nối tối đa 90s, nhưng rút ngắn theo thời gian còn lại thực tế
+// của người chơi đó (đang tới lượt thì khớp giờ nước đi, không thì bằng giờ nước đi tối đa
+// của họ + giờ nước đi còn lại của đối thủ, tức thời điểm sớm nhất tới lượt họ mà vẫn hết giờ).
+function awayGraceMs(room, color) {
+  const CAP = 90000, MIN = 15000;
+  if (!room.busy || !room.clocks) return CAP;
+  const tm = TIME[room.timeId || 3] || TIME[3];
+  const moveLeft = Math.max(0, room.clocks.moveLeft || 0);
+  const dyn = room.turn === color ? moveLeft : (tm.move + moveLeft);
+  return Math.max(MIN, Math.min(CAP, dyn));
+}
+
 function pruneRoom(room) {
   if (!room) return false;
   const now = Date.now();
   let droppedAway = false;
   room.players = (room.players || []).filter((p) => {
     if (live(p.ws)) { p.away = false; return true; }
-    if (room.busy && p.awaySince && now - p.awaySince < 90000) return true;
+    if (room.busy && p.awaySince && now - p.awaySince < awayGraceMs(room, p.color)) return true;
     if (p.away) droppedAway = true;
     return false;
   });
@@ -581,6 +593,10 @@ wss.on("connection", (ws) => {
           send(ws, { type: "resume-game", clocks: found.room.clocks, turn: found.room.turn, timeId: found.room.timeId || 3, game: visibleGame(found.room.game, found.color) });
         }
         seat(found.room);
+      } else {
+        // Báo cho client biết phiên tài khoản vẫn hợp lệ nhưng bàn cũ đã hết hạn chờ/không còn,
+        // để họ tự về trang chính thay vì đứng treo ở màn hình bàn cờ cũ.
+        send(ws, { type: "resume-none" });
       }
       return;
     }

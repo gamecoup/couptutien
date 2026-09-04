@@ -3,6 +3,8 @@ var pendingAuth = null;
 var oauthLoginPending = false;
 var netConnectWaiters = [];
 var playPending = false;
+var netReconnectTimer = null;
+var netReconnectDelay = 2000;
 function escapeNetHtml(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch];
@@ -175,6 +177,15 @@ function onNetMsg(ev) {
   }
   if (msg.type === "peer-away") {
     addLog("Đối thủ mất kết nối. Đang chờ vào lại...");
+  }
+  if (msg.type === "resume-none") {
+    // Tài khoản vẫn hợp lệ nhưng bàn cũ đã hết hạn chờ/không còn tồn tại:
+    // chỉ đưa về trang chính, không đá ra màn hình đăng nhập.
+    if (net.room || (document.getElementById("gameWrap") && document.getElementById("gameWrap").classList.contains("show"))) {
+      addLog("Bàn cũ đã kết thúc do quá hạn chờ kết nối lại.");
+      document.getElementById("netHint").textContent = "Bàn cũ đã kết thúc do quá hạn chờ kết nối lại.";
+      goHome();
+    }
   }
   if (msg.type === "error") {
     playPending = false;
@@ -424,11 +435,14 @@ function connectNet(cb) {
     net.ws = null;
     netConnectWaiters = [];
     document.getElementById("netHint").textContent = "Không mở được WebSocket.";
+    scheduleReconnect();
     return;
   }
   var socket = net.ws;
   socket.onopen = function () {
     document.getElementById("netHint").textContent = "Đã kết nối. Tạo hoặc vào phòng.";
+    netReconnectDelay = 2000;
+    clearTimeout(netReconnectTimer);
     var tok = sessionStorage.getItem("coupSess");
     if (tok && !oauthLoginPending && signedIn()) netSend({ type: "resume", token: tok });
     sendHello();
@@ -444,11 +458,25 @@ function connectNet(cb) {
     playPending = false;
     var playButton = document.getElementById("btnPlayNow");
     if (playButton) playButton.disabled = false;
+    // Dừng đồng hồ client trong lúc mất mạng để tránh lastTick bị "đứng hình" rồi
+    // nhảy dt bất thường khi rAF chạy lại, gây báo hết giờ giả trước khi kết nối lại xong.
+    if (started && state && !state.over && net.online && !net.vsBot && !net.spectate && typeof stopTick === "function") stopTick();
+    scheduleReconnect();
   };
   socket.onerror = function () {
     document.getElementById("netHint").textContent = "Lỗi kết nối. Chạy server rồi mở http://localhost:8080";
   };
 }
+function scheduleReconnect() {
+  clearTimeout(netReconnectTimer);
+  netReconnectTimer = setTimeout(function () {
+    if (!net.ws || net.ws.readyState === 3) connectNet();
+    netReconnectDelay = Math.min(netReconnectDelay * 1.5, 15000);
+  }, netReconnectDelay);
+}
+window.addEventListener("online", function () {
+  if (!net.ws || net.ws.readyState === 3) connectNet();
+});
 function goLogin() {
   hideHall();
   document.getElementById("hub").classList.add("show");
@@ -1005,10 +1033,17 @@ function showInvite(msg) {
   document.getElementById("btnHubLogin").onclick = function () { goLogin(); };
   function reallyLeave(lost) {
     if (typeof playDoor === "function") playDoor();
-    if (lost && started && state && !state.over && net.color && net.online && !net.vsBot) {
-      // Thoát bàn giữa ván = xin thua, để server chốt ván (finishRoom) và báo cho đối thủ,
-      // tránh trường hợp bàn bị treo ở trạng thái "đang diễn ra" sau khi rời phòng.
-      netSend({ type: "resign" });
+    if (lost && started && state && !state.over && net.color) {
+      if (net.online && !net.vsBot) {
+        // Thoát bàn giữa ván = xin thua, để server chốt ván (finishRoom) và báo cho đối thủ,
+        // tránh trường hợp bàn bị treo ở trạng thái "đang diễn ra" sau khi rời phòng.
+        netSend({ type: "resign" });
+      } else if (net.vsBot && typeof finish === "function") {
+        // Chơi với máy không qua server nên phải tự xin thua tại chỗ, dùng chung
+        // luồng với nút "Xin thua" để trạng thái sẵn sàng/nút Về trang chính đồng bộ ngay.
+        const loser = net.color;
+        finish(loser === "red" ? "black" : "red", (loser === "red" ? "Đỏ" : "Đen") + " xin thua");
+      }
     }
     netSend({ type: "leave" });
     net.room = null;

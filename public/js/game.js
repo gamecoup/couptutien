@@ -1587,8 +1587,11 @@ function daysLeft(ts) {
   return left > 0 ? Math.ceil(left / 86400000) : 0;
 }
 function saveOwnName(name) {
-  name = String(name || "").trim().slice(0, 16);
-  if (!name) return false;
+  name = String(name || "").trim();
+  if (!/^[A-Za-z0-9_]{6,24}$/.test(name)) {
+    addLog("Tên 6-24 ký tự, chỉ chữ không dấu/số/gạch dưới, không khoảng trắng.");
+    return false;
+  }
   const me = meStore();
   const accAt = net.account && net.account.renamedAt;
   const wait = daysLeft(accAt || me.renamedAt || 0);

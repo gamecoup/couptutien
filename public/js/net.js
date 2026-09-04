@@ -110,6 +110,7 @@ function applySeat(msg) {
   if (!started && typeof resetBoard === "function") resetBoard();
   if (typeof applyViewLayout === "function") applyViewLayout();
   if (typeof paintSeats === "function") paintSeats();
+  if (!started && typeof updateReadyUI === "function") updateReadyUI();
   var side = net.color === "red" ? "Đỏ" : net.color === "black" ? "Đen" : "?";
   if (msg.count >= 2 && net.color) {
     document.getElementById("netHint").textContent =
@@ -852,7 +853,7 @@ function showInvite(msg) {
   nameInp.oninput = function () {
     var next = this.value.trim();
     var cur = loadMe().name || "";
-    var ok = next.length >= 2 && next !== cur;
+    var ok = /^[A-Za-z0-9_]{6,24}$/.test(next) && next !== cur;
     btnSaveNm.hidden = !ok;
   };
   nameInp.onblur = function () {
@@ -932,7 +933,7 @@ function showInvite(msg) {
   document.getElementById("btnFacebook").onclick = function () { openOAuth("facebook"); };
   document.getElementById("btnProfileOk").onclick = function () {
     var name = document.getElementById("newProfileName").value.trim();
-    if (name.length < 2) { addLog("Tên từ 2 đến 16 ký tự."); return; }
+    if (!/^[A-Za-z0-9_]{6,24}$/.test(name)) { addLog("Tên 6-24 ký tự, chỉ chữ không dấu/số/gạch dưới, không khoảng trắng."); return; }
     connectNet(function () { netSend({ type: "profile-create", name: name }); });
   };
   document.getElementById("btnLogout").onclick = function () {
@@ -1004,9 +1005,10 @@ function showInvite(msg) {
   document.getElementById("btnHubLogin").onclick = function () { goLogin(); };
   function reallyLeave(lost) {
     if (typeof playDoor === "function") playDoor();
-    if (lost && started && state && !state.over && net.color) {
-      const loser = net.color;
-      finish(loser === "red" ? "black" : "red", (loser === "red" ? "Đỏ" : "Đen") + " thoát phòng");
+    if (lost && started && state && !state.over && net.color && net.online && !net.vsBot) {
+      // Thoát bàn giữa ván = xin thua, để server chốt ván (finishRoom) và báo cho đối thủ,
+      // tránh trường hợp bàn bị treo ở trạng thái "đang diễn ra" sau khi rời phòng.
+      netSend({ type: "resign" });
     }
     netSend({ type: "leave" });
     net.room = null;

@@ -213,6 +213,9 @@ function saveAcc(list) { store.saveAcc(list); }
 function hashPass(p, salt) { return store.hashPass(p, salt); }
 function pubAcc(acc) { return store.pubAcc(acc); }
 function norm(s) { return String(s || "").trim().toLowerCase(); }
+const NAME_RE = /^[A-Za-z0-9_]{6,24}$/;
+function validName(s) { return NAME_RE.test(String(s || "")); }
+const NAME_RULE_TEXT = "Tên 6-24 ký tự, chỉ chữ cái không dấu/số/gạch dưới, không khoảng trắng.";
 function publicProfile(ws) {
   if (!ws || !ws.profile) return null;
   return { id: ws.profile.id, name: ws.profile.name || "Đạo hữu" };
@@ -280,9 +283,11 @@ function sendGameSync(room) {
 function pruneRoom(room) {
   if (!room) return false;
   const now = Date.now();
+  let droppedAway = false;
   room.players = (room.players || []).filter((p) => {
     if (live(p.ws)) { p.away = false; return true; }
     if (room.busy && p.awaySince && now - p.awaySince < 90000) return true;
+    if (p.away) droppedAway = true;
     return false;
   });
   room.specs = (room.specs || []).filter((s) => live(s));
@@ -291,6 +296,16 @@ function pruneRoom(room) {
     return false;
   }
   if (!room.players.some((p) => p.host)) room.players[0].host = true;
+  if (droppedAway) {
+    // Hết hạn chờ hồi kết nối: gỡ cờ busy để người còn lại không bị treo mãi ở "Ván đang diễn ra".
+    room.busy = false;
+    room.over = true;
+    room.game = null;
+    room.clocks = null;
+    room.players.forEach((p) => { p.ready = false; });
+    room.version = (room.version || 0) + 1;
+    room.players.forEach((p) => send(p.ws, { type: "peer-left", count: room.players.length }));
+  }
   return true;
 }
 
@@ -404,8 +419,17 @@ function leaveRoom(ws, silent) {
   }
   if (wasSpec) {
     sendSpecCount(room);
-  } else if (!silent) {
-    room.players.forEach((p) => send(p.ws, { type: "peer-left", count: room.players.length }));
+  } else {
+    // Người rời phòng khiến ván treo ở trạng thái "busy": xóa cờ để bàn còn lại có thể sẵn sàng lại.
+    room.busy = false;
+    room.over = true;
+    room.game = null;
+    room.clocks = null;
+    room.players.forEach((p) => { p.ready = false; });
+    room.version = (room.version || 0) + 1;
+    if (!silent) {
+      room.players.forEach((p) => send(p.ws, { type: "peer-left", count: room.players.length }));
+    }
     seat(room);
   }
   sendSpecCount(room);
@@ -767,8 +791,8 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "profile-create") {
       if (!ws.account) { send(ws, { type: "error", text: "Cần đăng nhập Google/Facebook trước." }); return; }
-      const next = String(msg.name || "").trim().slice(0, 16);
-      if (next.length < 2) { send(ws, { type: "error", text: "Tên từ 2 đến 16 ký tự." }); return; }
+      const next = String(msg.name || "").trim();
+      if (!validName(next)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
       const accs = loadAcc();
       if (accs.some((a) => a.id !== ws.account.id && norm(a.name) === norm(next))) {
         send(ws, { type: "error", text: "Tên đã có người dùng." }); return;
@@ -797,18 +821,18 @@ wss.on("connection", (ws) => {
       const contact = norm(msg.contact);
       const via = String(msg.via || "email");
       const pass = String(msg.pass || "");
-      let name = String(msg.name || "").trim().slice(0, 16);
+      const name = String(msg.name || "").trim();
       if (!contact || contact.length < 6) {
         send(ws, { type: "error", text: "Cần email, SĐT hoặc tài khoản mạng xã hội." });
         return;
       }
       if (pass.length < 4) { send(ws, { type: "error", text: "Mật khẩu tối thiểu 4 ký tự." }); return; }
+      if (!validName(name)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
       const accs = loadAcc();
       if (accs.some((a) => a.contact === contact)) {
         send(ws, { type: "error", text: "Tài khoản đã tồn tại. Hãy đăng nhập." });
         return;
       }
-      if (!name) name = "Đạo hữu";
       if (accs.some((a) => norm(a.name) === norm(name))) {
         send(ws, { type: "error", text: "Tên đã có người dùng." });
         return;
@@ -860,8 +884,9 @@ wss.on("connection", (ws) => {
         }
       }
       if (msg.name) {
-        const next = String(msg.name).trim().slice(0, 16);
+        const next = String(msg.name).trim();
         if (next && next !== acc.name) {
+          if (!validName(next)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
           if (acc.renamedAt && Date.now() - acc.renamedAt < wait) {
             send(ws, { type: "error", text: "Tên chỉ đổi 30 ngày một lần." });
             return;
@@ -939,8 +964,8 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "rename") {
       if (!ws.account) { send(ws, { type: "error", text: "Chưa đăng ký nên không đổi tên được." }); return; }
-      const next = String(msg.name || "").trim().slice(0, 16);
-      if (!next) return;
+      const next = String(msg.name || "").trim();
+      if (!validName(next)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
       const wait = 30 * 24 * 60 * 60 * 1000;
       if (ws.account.renamedAt && Date.now() - ws.account.renamedAt < wait) {
         send(ws, { type: "error", text: "Chỉ đổi tên 30 ngày một lần." });
@@ -975,53 +1000,19 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "search") {
       const q = norm(msg.q);
-      const online = new Map();
-      wss.clients.forEach((c) => {
-        if (!live(c) || !c.profile) return;
-        online.set(c.profile.id, c);
-        if (c.account && c.account.id) online.set(c.account.id, c);
-      });
-      function haystack(acc, prof) {
-        return [
-          prof && prof.name,
-          acc && acc.name,
-          acc && acc.contact,
-          acc && acc.email,
-          acc && acc.provider,
-          acc && acc.via,
-          acc && acc.providerId
-        ].map((s) => norm(s)).join(" ");
-      }
-      const seen = new Set();
       const list = [];
-      wss.clients.forEach((c) => {
-        if (!live(c) || c === ws || !c.profile) return;
-        if (q && haystack(c.account, c.profile).indexOf(q) < 0) return;
-        seen.add(c.profile.id);
-        if (c.account) seen.add(c.account.id);
-        list.push({
-          id: c.profile.id,
-          name: (c.account && c.account.name) || c.profile.name,
-          via: (c.account && (c.account.provider || c.account.via)) || "online",
-          contact: c.account ? (c.account.email || c.account.contact || "") : "",
-          room: c.roomId || null,
-          busy: !!(c.roomId && rooms.get(c.roomId) && rooms.get(c.roomId).busy),
-          online: true
-        });
-      });
       if (q) {
-        loadAcc().forEach((acc) => {
-          if (!acc || seen.has(acc.id)) return;
-          if (haystack(acc, acc).indexOf(q) < 0) return;
-          const liveC = online.get(acc.id);
+        wss.clients.forEach((c) => {
+          if (!live(c) || c === ws || !c.profile) return;
+          const name = (c.account && c.account.name) || c.profile.name || "";
+          if (norm(name) !== q) return;
           list.push({
-            id: acc.id,
-            name: acc.name || "Đạo hữu",
-            via: acc.provider || acc.via || "",
-            contact: acc.email || acc.contact || "",
-            room: liveC ? liveC.roomId : null,
-            busy: !!(liveC && liveC.roomId && rooms.get(liveC.roomId) && rooms.get(liveC.roomId).busy),
-            online: !!liveC
+            id: c.profile.id,
+            name: name,
+            via: (c.account && (c.account.provider || c.account.via)) || "online",
+            room: c.roomId || null,
+            busy: !!(c.roomId && rooms.get(c.roomId) && rooms.get(c.roomId).busy),
+            online: true
           });
         });
       }
@@ -1080,6 +1071,10 @@ wss.on("connection", (ws) => {
       if (pld.kind === "chat") {
         const text = String(pld.text || "").trim().slice(0, 80);
         if (!text) return;
+        // Chong spam: toi da 1 tin/10s cho moi nguoi choi, vuot thi lang le bo qua.
+        const now = Date.now();
+        if (ws.lastChatAt && now - ws.lastChatAt < 10000) return;
+        ws.lastChatAt = now;
         const color = player ? player.color : null;
         const fallback = color === "red" ? "Đỏ" : color === "black" ? "Đen" : "Người xem";
         const who = String((ws.profile && ws.profile.name) || fallback).slice(0, 16);

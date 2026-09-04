@@ -744,6 +744,10 @@ function finish(winner, reason, fromNet) {
   setStatus();
   draw();
   addLog((winner === "draw" ? "Hòa" : ((winner === "red" ? "Đỏ" : "Đen") + " thắng")) + " — " + reason);
+  if (isBotTable() && net.color) {
+    const tier = botAdaptRecordResult(net.botLevel || "normal", winner === net.color, winner === "draw");
+    if (tier) addLog("Bot vừa đột phá cảnh giới (nấc " + tier + ") ở mức " + ((BOT_LEVELS[net.botLevel] || BOT_LEVELS.normal).label) + " — từ nay đánh mạnh hơn hẳn.");
+  }
   if (nextFirst) nextFirst = nextFirst === "red" ? "black" : "red";
   pendingDraw = null;
   hideDrawAsk();
@@ -830,11 +834,110 @@ function applyMove(mv, fromNet, extra) {
   }
 }
 const BOT_LEVELS = {
-  normal: { label: "Trúc Cơ", depth: 5,  timeMs: 700,  mistakeChance: 0.12 },
-  hard:   { label: "Kim Đan", depth: 7,  timeMs: 1500, mistakeChance: 0 },
-  master: { label: "Hóa Thần", depth: 10, timeMs: 3000, mistakeChance: 0 }
+  normal: { label: "Trúc Cơ", depth: 6,  timeMs: 1200, mistakeChance: 0.05, samples: 2 },
+  hard:   { label: "Kim Đan", depth: 8,  timeMs: 2200, mistakeChance: 0, samples: 2 },
+  master: { label: "Hóa Thần", depth: 12, timeMs: 4000, mistakeChance: 0, samples: 2 }
 };
+const BOT_ADAPT_KEY = "coupBotAdapt";
+const BOT_BREAKTHROUGH_STREAK = 3; // thắng liên tiếp bấy nhiêu ván mới ép bot "đột phá" vĩnh viễn
+const BOT_MAX_TIER = 6;
+// adj: dao động ngắn hạn, lên/xuống theo ván gần nhất (như cũ, chỉ siết/nhả trong dải nhỏ).
+// tier: nấc "đột phá cảnh giới" vĩnh viễn, chỉ tăng không giảm — đây là phần thật sự làm bot mạnh dần lâu dài.
+function botAdaptLoad() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BOT_ADAPT_KEY) || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (e) { return {}; }
+}
+function botAdaptSave(data) {
+  try { localStorage.setItem(BOT_ADAPT_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function botAdaptRecordResult(levelKey, humanWon, isDraw) {
+  if (!levelKey) return 0;
+  const data = botAdaptLoad();
+  const rec = data[levelKey] || {adj: 0, tier: 0, streak: 0, games: 0};
+  rec.games = (rec.games || 0) + 1;
+  let brokeThrough = 0;
+  if (isDraw) {
+    rec.streak = 0;
+  } else if (humanWon) {
+    rec.adj = Math.max(-2, Math.min(2, (rec.adj || 0) + 1));
+    rec.streak = (rec.streak || 0) + 1;
+    if (rec.streak >= BOT_BREAKTHROUGH_STREAK && (rec.tier || 0) < BOT_MAX_TIER) {
+      rec.tier = (rec.tier || 0) + 1;
+      rec.streak = 0;
+      rec.adj = 0;
+      brokeThrough = rec.tier;
+    }
+  } else {
+    rec.adj = Math.max(-2, Math.min(2, (rec.adj || 0) - 1));
+    rec.streak = 0;
+  }
+  data[levelKey] = rec;
+  botAdaptSave(data);
+  return brokeThrough;
+}
+function botAdaptLevel(baseLevel, levelKey) {
+  const rec = botAdaptLoad()[levelKey] || {};
+  const tier = rec.tier || 0, adj = rec.adj || 0;
+  if (!tier && !adj) return baseLevel;
+  const depth = Math.max(3, Math.min(18, baseLevel.depth + tier + adj));
+  const timeFactor = (1 + tier * 0.15) * (1 + adj * 0.1);
+  const timeMs = Math.round(Math.max(baseLevel.timeMs * 0.6, Math.min(baseLevel.timeMs * 2.5, baseLevel.timeMs * timeFactor)));
+  const mistakeChance = Math.max(0, Math.min(0.35, (baseLevel.mistakeChance || 0) - tier * 0.02 - adj * 0.02));
+  return Object.assign({}, baseLevel, {depth: depth, timeMs: timeMs, mistakeChance: mistakeChance});
+}
 const BOT_PIECE_VAL = {K:10000, R:900, C:450, H:400, E:200, A:200, P:100};
+const BOT_BAG_COUNTS = {A:2, E:2, H:2, R:2, C:2, P:5};
+// Bot phải suy đoán quân úp như người thật: không được đọc trực tiếp p.type của quân chưa lật.
+function botRemainingPool(board, capturedOfColor, color) {
+  const pool = Object.assign({}, BOT_BAG_COUNTS);
+  function consume(type) { if (pool[type] > 0) pool[type]--; }
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) {
+      const p = board[r][c];
+      if (p && p.color === color && p.revealed && p.type !== "K") consume(p.type);
+    }
+  (capturedOfColor || []).forEach(function (p) {
+    if (p.revealed && p.type !== "K") consume(p.type);
+  });
+  return pool;
+}
+function botPoolToArray(pool) {
+  const arr = [];
+  Object.keys(pool).forEach(function (t) {
+    for (let i = 0; i < pool[t]; i++) arr.push(t);
+  });
+  return arr;
+}
+function botShuffleArr(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+// Tạo một "thế giới giả định" hợp lệ: quân đã lật giữ nguyên, quân còn úp được gán ngẫu nhiên
+// từ đúng số quân còn lại trong bao — giống hệt mức độ thông tin một người chơi thật có được.
+function botDeterminize(board, captured) {
+  const nb = board.map(function (row) { return row.map(clonePiece); });
+  ["red", "black"].forEach(function (color) {
+    const opp = color === "red" ? "black" : "red";
+    const capturedOfColor = (captured && captured[opp]) || [];
+    const pool = botShuffleArr(botPoolToArray(botRemainingPool(board, capturedOfColor, color)));
+    let idx = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++) {
+        const p = nb[r][c];
+        if (p && p.color === color && !p.revealed) {
+          p.type = idx < pool.length ? pool[idx] : p.slot;
+          idx++;
+        }
+      }
+  });
+  return nb;
+}
 function botPseudoMobility(board, color) {
   let n = 0;
   for (let r = 0; r < ROWS; r++)
@@ -843,6 +946,22 @@ function botPseudoMobility(board, color) {
       if (p && p.color === color) n += rawMoves(board, c, r).length;
     }
   return n;
+}
+function botRookOpenFileBonus(board, c) {
+  let blockers = 0;
+  for (let r = 0; r < ROWS; r++) if (board[r][c]) blockers++;
+  return Math.max(0, 6 - blockers) * 4;
+}
+function botGuardCounts(board, color) {
+  let advisors = 0, elephants = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) {
+      const p = board[r][c];
+      if (!p || p.color !== color) continue;
+      if (p.type === "A") advisors++;
+      else if (p.type === "E") elephants++;
+    }
+  return {advisors: advisors, elephants: elephants};
 }
 function botEvaluate(board, color) {
   const opp = color === "red" ? "black" : "red";
@@ -854,29 +973,43 @@ function botEvaluate(board, color) {
       let v = BOT_PIECE_VAL[p.type] || 0;
       if (p.type === "P" && crossedRiver(p.color, r)) v += 90;
       if (p.type === "H" || p.type === "C") v += (4 - Math.abs(c - 4)) * 3;
-      if (p.type === "R") v += (4 - Math.abs(c - 4)) * 2;
+      if (p.type === "R") v += (4 - Math.abs(c - 4)) * 2 + botRookOpenFileBonus(board, c);
       // hidden strong piece keeps human opponent guessing: small deception bonus
       if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) v += 12;
       score += (p.color === color) ? v : -v;
     }
   score += (botPseudoMobility(board, color) - botPseudoMobility(board, opp)) * 2;
+  const mine = botGuardCounts(board, color), theirs = botGuardCounts(board, opp);
+  score += (mine.advisors - theirs.advisors) * 18 + (mine.elephants - theirs.elephants) * 16;
+  if (mine.advisors === 2) score += 10;
+  if (mine.elephants === 2) score += 10;
   return score;
 }
 function botMoveKey(m) { return m.fromC + "," + m.fromR + ">" + m.toC + "," + m.toR; }
-function botOrderMoves(board, moves, ttMove) {
+function botOrderMoves(board, moves, ttMove, depth) {
   const ttKey = ttMove ? botMoveKey(ttMove) : null;
+  const killers = (botKillers && botKillers[depth]) || null;
   return moves.slice().sort(function (a, b) {
-    return botMoveScore(board, b, ttKey) - botMoveScore(board, a, ttKey);
+    return botMoveScore(board, b, ttKey, killers) - botMoveScore(board, a, ttKey, killers);
   });
 }
-function botMoveScore(board, m, ttKey) {
-  if (ttKey && botMoveKey(m) === ttKey) return 1e6;
+function botMoveScore(board, m, ttKey, killers) {
+  const key = botMoveKey(m);
+  if (ttKey && key === ttKey) return 1e7;
   const cap = board[m.toR][m.toC];
-  if (!cap) return 0;
-  const att = board[m.fromR][m.fromC];
-  return 1000 + (BOT_PIECE_VAL[cap.type] || 0) * 10 - (BOT_PIECE_VAL[att.type] || 0);
+  if (cap) {
+    const att = board[m.fromR][m.fromC];
+    return 1e6 + (BOT_PIECE_VAL[cap.type] || 0) * 10 - (BOT_PIECE_VAL[att.type] || 0);
+  }
+  if (killers && (killers[0] === key || killers[1] === key)) return 5e5;
+  return (botHistory && botHistory[key]) || 0;
 }
-let botTT, botNodes, botDeadline, botTimeUp;
+function botStoreKiller(depth, key) {
+  if (!botKillers[depth]) botKillers[depth] = [null, null];
+  const k = botKillers[depth];
+  if (k[0] !== key) { k[1] = k[0]; k[0] = key; }
+}
+let botTT, botNodes, botDeadline, botTimeUp, botKillers, botHistory;
 function botTimeCheck() {
   botNodes++;
   if ((botNodes & 1023) === 0 && Date.now() > botDeadline) botTimeUp = true;
@@ -889,7 +1022,7 @@ function botQuiesce(board, alpha, beta, color) {
   if (standPat > alpha) alpha = standPat;
   const opp = color === "red" ? "black" : "red";
   const moves = allLegal(board, color).filter(function (m) { return !!board[m.toR][m.toC]; });
-  const ordered = botOrderMoves(board, moves, null);
+  const ordered = botOrderMoves(board, moves, null, -1);
   for (let i = 0; i < ordered.length; i++) {
     const nb = applyMoveBoard(board, ordered[i]);
     const val = -botQuiesce(nb, -beta, -alpha, opp);
@@ -920,7 +1053,7 @@ function botNegamax(board, depth, alpha, beta, color, ply) {
   if (depth <= 0) return botQuiesce(board, alpha, beta, color);
   const moves = allLegal(board, color);
   if (!moves.length) return -9000 + ply; // no legal move = loss under this ruleset
-  const ordered = botOrderMoves(board, moves, ttMove);
+  const ordered = botOrderMoves(board, moves, ttMove, depth);
   let best = -Infinity, bestMove = null;
   for (let i = 0; i < ordered.length; i++) {
     const m = ordered[i];
@@ -929,7 +1062,13 @@ function botNegamax(board, depth, alpha, beta, color, ply) {
     if (botTimeUp) return best === -Infinity ? 0 : best;
     if (val > best) { best = val; bestMove = m; }
     if (best > alpha) alpha = best;
-    if (alpha >= beta) break;
+    if (alpha >= beta) {
+      if (!board[m.toR][m.toC]) {
+        botStoreKiller(depth, botMoveKey(m));
+        botHistory[botMoveKey(m)] = (botHistory[botMoveKey(m)] || 0) + depth * depth;
+      }
+      break;
+    }
   }
   let flag = 0;
   if (best <= origAlpha) flag = -1;
@@ -937,45 +1076,71 @@ function botNegamax(board, depth, alpha, beta, color, ply) {
   botTT.set(key, {depth: depth, score: best, move: bestMove, flag: flag});
   return best;
 }
-function botChooseMove(board, color, level) {
-  const rootMoves = allLegal(board, color);
-  if (!rootMoves.length) return null;
+function botSearchOnBoard(board, color, depth, timeMs, rootMoves) {
   botTT = new Map();
   botNodes = 0; botTimeUp = false;
-  botDeadline = Date.now() + Math.max(150, level.timeMs || 700);
+  botDeadline = Date.now() + Math.max(80, timeMs || 500);
   const opp = color === "red" ? "black" : "red";
-  let bestMove = rootMoves[0], ttMove = null;
-  for (let depth = 1; depth <= (level.depth || 5); depth++) {
+  let bestMove = rootMoves[0], bestScore = 0, ttMove = null;
+  for (let d = 1; d <= (depth || 5); d++) {
     let alpha = -Infinity, beta = Infinity;
     let localBest = null, localScore = -Infinity;
-    const ordered = botOrderMoves(board, rootMoves, ttMove);
+    const ordered = botOrderMoves(board, rootMoves, ttMove, d);
     let timedOut = false;
     for (let i = 0; i < ordered.length; i++) {
       const m = ordered[i];
       const nb = applyMoveBoard(board, m);
-      const val = -botNegamax(nb, depth - 1, -beta, -alpha, opp, 1);
+      const val = -botNegamax(nb, d - 1, -beta, -alpha, opp, 1);
       if (botTimeUp) { timedOut = true; break; }
       if (val > localScore) { localScore = val; localBest = m; }
       if (localScore > alpha) alpha = localScore;
     }
     if (timedOut || !localBest) break;
-    bestMove = localBest; ttMove = localBest;
+    bestMove = localBest; bestScore = localScore; ttMove = localBest;
     if (Date.now() > botDeadline) break;
   }
+  return {move: bestMove, score: bestScore};
+}
+// Chơi kiểu "Perfect Information Monte Carlo": mỗi lượt lấy vài thế giới giả định khác nhau
+// (quân úp được xáo ngẫu nhiên hợp lệ), tìm nước tốt nhất trong từng thế giới rồi bỏ phiếu chọn
+// nước được ủng hộ nhiều nhất — bot không còn "nhìn trộm" được quân úp thật sự là gì.
+function botChooseMove(board, color, captured, level) {
+  const rootMoves = allLegal(board, color);
+  if (!rootMoves.length) return null;
+  const samples = Math.max(1, level.samples || 1);
+  const perSampleMs = Math.max(80, Math.floor((level.timeMs || 700) / samples));
+  botKillers = {}; botHistory = {};
+  const tally = new Map();
+  for (let s = 0; s < samples; s++) {
+    const sampledBoard = botDeterminize(board, captured);
+    const result = botSearchOnBoard(sampledBoard, color, level.depth, perSampleMs, rootMoves);
+    if (!result.move) continue;
+    const key = botMoveKey(result.move);
+    const cur = tally.get(key) || {move: result.move, total: 0, count: 0};
+    cur.total += result.score;
+    cur.count++;
+    tally.set(key, cur);
+  }
+  let best = null;
+  tally.forEach(function (v) {
+    if (!best || v.count > best.count || (v.count === best.count && v.total / v.count > best.total / best.count)) best = v;
+  });
+  if (!best) return rootMoves[Math.floor(Math.random() * rootMoves.length)];
   if (level.mistakeChance && Math.random() < level.mistakeChance) {
     return rootMoves[Math.floor(Math.random() * rootMoves.length)];
   }
-  return bestMove;
+  return best.move;
 }
 function botPlay() {
   botTimer = null;
   if (!net.vsBot || !state || state.over) return;
   const color = state.turn;
   if (net.color && color === net.color) return;
-  const level = BOT_LEVELS[net.botLevel] || BOT_LEVELS.normal;
+  const levelKey = net.botLevel || "normal";
+  const level = botAdaptLevel(BOT_LEVELS[levelKey] || BOT_LEVELS.normal, levelKey);
   let timeMs = level.timeMs;
   if (clocks && typeof clocks.moveLeft === "number") timeMs = Math.max(150, Math.min(timeMs, clocks.moveLeft * 0.6));
-  const pick = botChooseMove(state.board, color, {depth: level.depth, timeMs: timeMs, mistakeChance: level.mistakeChance});
+  const pick = botChooseMove(state.board, color, state.captured, Object.assign({}, level, {timeMs: timeMs}));
   if (!pick) return;
   applyMove(pick, true);
 }

@@ -1353,28 +1353,18 @@ function drawPiece(p, c, r, checkedKing) {
   const isLastMoveTarget = lastMove && lmElapsed < LAST_MOVE_GLOW_MS && lastMove.toC === c && lastMove.toR === r;
   let fade = 0, pulse = 0;
   if (isLastMoveTarget) {
-    // Nước đi mới nhất: viền vàng phát sáng nhấp nháy, mờ dần về cuối thời gian hiển thị.
     fade = 1 - lmElapsed / LAST_MOVE_GLOW_MS;
     pulse = 0.5 + 0.5 * Math.sin(performance.now() / 200);
-    ctx.save();
-    ctx.shadowColor = "rgba(255,193,7," + (0.85 * fade) + ")";
-    ctx.shadowBlur = 8 + 10 * pulse * fade;
-    ctx.beginPath();
-    ctx.arc(x, y, rad + 4, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,179,0," + ((0.55 + 0.4 * pulse) * fade) + ")";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
   }
   ctx.beginPath();
   ctx.arc(x, y, rad, 0, Math.PI * 2);
   ctx.fillStyle = p.revealed ? "#f7ecd0" : "#5a3514";
   ctx.fill();
   if (isLastMoveTarget) {
-    // Bản thân quân cờ nhấp nháy ánh vàng, không che chữ bên dưới.
+    // Nước đi mới nhất: bề mặt quân cờ nhấp nháy ánh xanh lá, mờ dần theo thời gian.
     ctx.beginPath();
     ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,193,7," + (0.4 + 0.35 * pulse) * fade + ")";
+    ctx.fillStyle = "rgba(76,175,80," + (0.4 + 0.35 * pulse) * fade + ")";
     ctx.fill();
   }
   if (p.revealed) {
@@ -1386,34 +1376,9 @@ function drawPiece(p, c, r, checkedKing) {
     ctx.fillText(ch, x, y + 0.4);
   }
 }
-function drawLastMoveHighlight(lmElapsed) {
-  const fade = 1 - lmElapsed / LAST_MOVE_GLOW_MS;
-  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
-  const sqs = [
-    {c: lastMove.fromC, r: lastMove.fromR, k: 0.85},
-    {c: lastMove.toC, r: lastMove.toR, k: 1}
-  ];
-  for (let i = 0; i < sqs.length; i++) {
-    const sq = sqs[i];
-    const x = MARGIN + viewC(sq.c) * CELL, y = MARGIN + viewR(sq.r) * CELL, rad = CELL * 0.47;
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,193,7," + (0.16 + 0.14 * pulse) * fade * sq.k + ")";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,152,0," + (0.55 + 0.35 * pulse) * fade * sq.k + ")";
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-  }
-}
 function draw() {
   if (!state) return;
   drawBoard();
-  const lmElapsed = lastMove ? performance.now() - lastMoveTime : Infinity;
-  if (lastMove && lmElapsed < LAST_MOVE_GLOW_MS) {
-    drawLastMoveHighlight(lmElapsed);
-  }
   if (selected) {
     const x = MARGIN + viewC(selected.c) * CELL, y = MARGIN + viewR(selected.r) * CELL;
     ctx.beginPath(); ctx.arc(x, y, CELL * 0.42, 0, Math.PI * 2);

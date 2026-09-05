@@ -5,7 +5,6 @@ const { WebSocketServer } = require("ws");
 const store = require("./lib/store");
 const oauth = require("./lib/oauth");
 const rules = require("./lib/rules");
-const otps = new Map();
 const sessions = new Map();
 const TIME = {
   3: { game: 180000, move: 15000 },
@@ -15,42 +14,6 @@ const TIME = {
 };
 
 const PORT = process.env.PORT || 8080;
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-async function sendOtpMail(to, otp) {
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER || "noreply@co-up.local";
-  const subject = "Ma OTP Co Up Tu Tien";
-  const text = "Ma OTP lay lai mat khau: " + otp + "\nHieu luc 2 phut. Toi da 3 lan/ngay.";
-  if (process.env.RESEND_API_KEY) {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + process.env.RESEND_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ from: from, to: [to], subject: subject, text: text })
-    });
-    if (!res.ok) throw new Error("resend " + res.status);
-    return;
-  }
-  if (process.env.SMTP_HOST) {
-    let nodemailer;
-    try { nodemailer = require("nodemailer"); } catch (e) { throw new Error("thieu nodemailer"); }
-    const trans = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: String(process.env.SMTP_SECURE || "") === "1",
-      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined
-    });
-    await trans.sendMail({ from: from, to: to, subject: subject, text: text });
-    return;
-  }
-  console.log("[OTP email chua cau hinh] " + to);
-  throw new Error("chua-cau-hinh-email");
-}
 
 const ROOT = path.join(__dirname, "public");
 const MIME = {
@@ -215,7 +178,6 @@ store.ensureDir();
 
 function loadAcc() { return store.loadAcc(); }
 function saveAcc(list) { store.saveAcc(list); }
-function hashPass(p, salt) { return store.hashPass(p, salt); }
 function pubAcc(acc) { return store.pubAcc(acc); }
 function norm(s) { return String(s || "").trim().toLowerCase(); }
 const NAME_RE = /^[A-Za-z0-9_]{6,24}$/;
@@ -295,7 +257,6 @@ function sendGameSync(room) {
   }));
 }
 
-// Cưỡng bức dọn sạch mọi vết tích của người chơi khỏi tất cả các phòng cũ
 function purgeUserFromAllRooms(ws) {
   if (!ws) return;
   const tok = ws.token;
@@ -624,7 +585,6 @@ function finishRoom(room, winner, reason) {
     names: room.players.map((p) => (p.ws && p.ws.profile && p.ws.profile.name) || p.color)
   });
 
-  // Hủy triệt để trạng thái cờ cũ để không lưu rác sang ván mới
   room.game = null;
   room.clocks = null;
 
@@ -749,7 +709,6 @@ wss.on("connection", (ws) => {
       send(ws, { type: "session", token: ws.token, account: ws.account ? pubAcc(ws.account) : null });
 
       if (found) {
-        // Nếu ván vẫn đang diễn ra thực sự -> Cho chơi tiếp
         if (found.room.busy && !found.room.over && found.room.game && found.room.clocks) {
           send(ws, { 
             type: "joined", 
@@ -761,8 +720,6 @@ wss.on("connection", (ws) => {
           });
           restoreGameBoard(found.room, found.player, ws);
         } else {
-          // Nếu ván ĐÃ HẾT GIỜ / ĐÃ XỬ THUA trong lúc vắng mặt:
-          // Bắt buộc gửi finish để client giải phóng trạng thái cờ cũ, mở khóa nút Sẵn sàng!
           send(ws, {
             type: "relay",
             payload: { 
@@ -788,7 +745,6 @@ wss.on("connection", (ws) => {
           seat(found.room);
         }
       } else {
-        // Nếu phòng cũ đã bị xóa sau 40s: Gửi finish dập tắt cờ treo trên client rồi đưa về sảnh
         ws.roomId = null;
         send(ws, {
           type: "relay",
@@ -902,7 +858,6 @@ wss.on("connection", (ws) => {
         if (room.busy && !room.over && room.game && room.clocks) {
           restoreGameBoard(room, already, ws);
         } else {
-          // Dập tắt cờ cũ và mở khóa phòng chờ
           send(ws, {
             type: "relay",
             payload: { kind: "finish", winner: room.lastWinner || "draw", reason: room.lastReason || "Kết thúc" }
@@ -1087,55 +1042,6 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    if (msg.type === "register") {
-      const contact = norm(msg.contact);
-      const via = String(msg.via || "email");
-      const pass = String(msg.pass || "");
-      const name = String(msg.name || "").trim();
-      if (!contact || contact.length < 6) {
-        send(ws, { type: "error", text: "Cần email, SĐT hoặc tài khoản mạng xã hội." });
-        return;
-      }
-      if (pass.length < 4) { send(ws, { type: "error", text: "Mật khẩu tối thiểu 4 ký tự." }); return; }
-      if (!validName(name)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
-      const accs = loadAcc();
-      if (accs.some((a) => a.contact === contact)) {
-        send(ws, { type: "error", text: "Tài khoản đã tồn tại. Hãy đăng nhập." });
-        return;
-      }
-      if (accs.some((a) => norm(a.name) === norm(name))) {
-        send(ws, { type: "error", text: "Tên đã có người dùng." });
-        return;
-      }
-      const hp = store.hashPass(pass);
-      const acc = { id: code() + code(), name, contact, via, salt: hp.salt, hash: hp.hash, pts: 0, renamedAt: 0, av: "", stats: { games: 0, wins: 0, losses: 0, draws: 0 } };
-      accs.push(acc);
-      saveAcc(accs);
-      ws.account = acc;
-      ws.profile = { id: acc.id, name: acc.name };
-      send(ws, { type: "account", acc: pubAcc(acc) });
-      return;
-    }
-
-    if (msg.type === "logout") {
-      ws.account = null;
-      send(ws, { type: "error", text: "Đã đăng xuất. Bạn đang là khách." });
-      return;
-    }
-
-    if (msg.type === "login") {
-      const contact = norm(msg.contact);
-      const acc = loadAcc().find((a) => a.contact === contact);
-      if (!acc || !store.checkPass(msg.pass, acc)) {
-        send(ws, { type: "error", text: "Sai tài khoản hoặc mật khẩu." });
-        return;
-      }
-      ws.account = acc;
-      ws.profile = { id: acc.id, name: acc.name };
-      send(ws, { type: "account", acc: pubAcc(acc) });
-      return;
-    }
-
     if (msg.type === "profile-save") {
       if (!ws.account) return;
       const accs = loadAcc();
@@ -1172,88 +1078,6 @@ wss.on("connection", (ws) => {
       saveAcc(accs);
       ws.account = acc;
       send(ws, { type: "account", acc: pubAcc(acc) });
-      return;
-    }
-
-    if (msg.type === "forgot") {
-      const contact = norm(msg.contact);
-      const accs = loadAcc();
-      const acc = accs.find((a) => a.contact === contact);
-      if (!acc) { send(ws, { type: "error", text: "Không thấy tài khoản này." }); return; }
-      if ((acc.via || "email") !== "email" && String(acc.contact).indexOf("@") < 0) {
-        send(ws, { type: "error", text: "Chỉ gửi OTP qua email đã đăng ký." }); return;
-      }
-      const day = todayKey();
-      if (acc.otpDay !== day) { acc.otpDay = day; acc.otpCount = 0; }
-      if ((acc.otpCount || 0) >= 3) {
-        send(ws, { type: "error", text: "Đã gọi OTP 3 lần hôm nay. Thử lại ngày mai." }); return;
-      }
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
-      otps.set(contact, { otp: otp, exp: Date.now() + 2 * 60 * 1000 });
-      acc.otpCount = (acc.otpCount || 0) + 1;
-      saveAcc(accs);
-      sendOtpMail(acc.contact, otp).then(function () {
-        send(ws, {
-          type: "otp",
-          via: "email",
-          contact: acc.contact,
-          text: "OTP 6 số đã gửi về email " + acc.contact + ". Hiệu lực 2 phút."
-        });
-      }).catch(function (err) {
-        console.log("otp mail", err && err.message);
-        send(ws, {
-          type: "otp",
-          via: "email",
-          contact: acc.contact,
-          text: "Chưa gửi được email (cần SMTP/RESEND trên Render). Kiểm tra cấu hình máy chủ."
-        });
-      });
-      return;
-    }
-
-    if (msg.type === "reset") {
-      const contact = norm(msg.contact);
-      const rec = otps.get(contact);
-      if (!rec || rec.exp < Date.now() || rec.otp !== String(msg.otp || "")) {
-        send(ws, { type: "error", text: "OTP sai hoặc hết hạn." });
-        return;
-      }
-      if (String(msg.pass || "").length < 4) { send(ws, { type: "error", text: "Mật khẩu mới tối thiểu 4 ký tự." }); return; }
-      const accs = loadAcc();
-      const acc = accs.find((a) => a.contact === contact);
-      if (!acc) return;
-      const nextPass = hashPass(msg.pass);
-      delete acc.pass;
-      acc.salt = nextPass.salt;
-      acc.hash = nextPass.hash;
-      saveAcc(accs);
-      otps.delete(contact);
-      send(ws, { type: "error", text: "Đã tạo mật khẩu mới. Hãy đăng nhập." });
-      return;
-    }
-
-    if (msg.type === "rename") {
-      if (!ws.account) { send(ws, { type: "error", text: "Chưa đăng ký nên không đổi tên được." }); return; }
-      const next = String(msg.name || "").trim();
-      if (!validName(next)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
-      const wait = 30 * 24 * 60 * 60 * 1000;
-      if (ws.account.renamedAt && Date.now() - ws.account.renamedAt < wait) {
-        send(ws, { type: "error", text: "Chỉ đổi tên 30 ngày một lần." });
-        return;
-      }
-      const accs = loadAcc();
-      if (accs.some((a) => a.id !== ws.account.id && norm(a.name) === norm(next))) {
-        send(ws, { type: "error", text: "Tên đã có người dùng." });
-        return;
-      }
-      const acc = accs.find((a) => a.id === ws.account.id);
-      if (!acc) return;
-      acc.name = next;
-      acc.renamedAt = Date.now();
-      saveAcc(accs);
-      ws.account = acc;
-      ws.profile.name = next;
-      send(ws, { type: "account", acc: { name: acc.name, contact: acc.contact, via: acc.via, pts: acc.pts || 0, renamedAt: acc.renamedAt } });
       return;
     }
 

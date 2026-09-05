@@ -65,7 +65,7 @@ var drawUsedPly = -1;
 var moveLock = false;
 var resignPending = false;
 var botTimer = null;
-// Hủy nước đi hẹn giờ của bot còn treo lại, tránh việc nó tự đánh vào ván mới sau khi rời bàn.
+
 function cancelBotTimer() {
   if (botTimer) { clearTimeout(botTimer); botTimer = null; }
 }
@@ -151,8 +151,6 @@ function applyScore(winner) {
   if (net.spectate || !net.color) {
     paintRanks();
     return "";
-  }
-  if (net.account && net.color) {
   }
   if (!net.account) {
     paintRanks();
@@ -346,6 +344,7 @@ function showLobby() {
   paintClocks();
   draw();
   renderModes();
+  applyViewLayout();
   if (typeof netSend === "function") netSend({ type: "busy", on: false });
   if (net.room && net.isHost && typeof relay === "function") relay({kind:"lobby"});
 }
@@ -833,16 +832,16 @@ function applyMove(mv, fromNet, extra) {
     botTimer = setTimeout(botPlay, 380);
   }
 }
+
 const BOT_LEVELS = {
   normal: { label: "Trúc Cơ", depth: 6,  timeMs: 1200, mistakeChance: 0.05, samples: 2 },
   hard:   { label: "Kim Đan", depth: 8,  timeMs: 2200, mistakeChance: 0, samples: 2 },
   master: { label: "Hóa Thần", depth: 12, timeMs: 4000, mistakeChance: 0, samples: 2 }
 };
 const BOT_ADAPT_KEY = "coupBotAdapt";
-const BOT_BREAKTHROUGH_STREAK = 3; // thắng liên tiếp bấy nhiêu ván mới ép bot "đột phá" vĩnh viễn
+const BOT_BREAKTHROUGH_STREAK = 3;
 const BOT_MAX_TIER = 6;
-// adj: dao động ngắn hạn, lên/xuống theo ván gần nhất (như cũ, chỉ siết/nhả trong dải nhỏ).
-// tier: nấc "đột phá cảnh giới" vĩnh viễn, chỉ tăng không giảm — đây là phần thật sự làm bot mạnh dần lâu dài.
+
 function botAdaptLoad() {
   try {
     const raw = JSON.parse(localStorage.getItem(BOT_ADAPT_KEY) || "{}");
@@ -889,7 +888,7 @@ function botAdaptLevel(baseLevel, levelKey) {
 }
 const BOT_PIECE_VAL = {K:10000, R:900, C:450, H:400, E:200, A:200, P:100};
 const BOT_BAG_COUNTS = {A:2, E:2, H:2, R:2, C:2, P:5};
-// Bot phải suy đoán quân úp như người thật: không được đọc trực tiếp p.type của quân chưa lật.
+
 function botRemainingPool(board, capturedOfColor, color) {
   const pool = Object.assign({}, BOT_BAG_COUNTS);
   function consume(type) { if (pool[type] > 0) pool[type]--; }
@@ -918,8 +917,6 @@ function botShuffleArr(arr) {
   }
   return a;
 }
-// Tạo một "thế giới giả định" hợp lệ: quân đã lật giữ nguyên, quân còn úp được gán ngẫu nhiên
-// từ đúng số quân còn lại trong bao — giống hệt mức độ thông tin một người chơi thật có được.
 function botDeterminize(board, captured) {
   const nb = board.map(function (row) { return row.map(clonePiece); });
   ["red", "black"].forEach(function (color) {
@@ -974,7 +971,6 @@ function botEvaluate(board, color) {
       if (p.type === "P" && crossedRiver(p.color, r)) v += 90;
       if (p.type === "H" || p.type === "C") v += (4 - Math.abs(c - 4)) * 3;
       if (p.type === "R") v += (4 - Math.abs(c - 4)) * 2 + botRookOpenFileBonus(board, c);
-      // hidden strong piece keeps human opponent guessing: small deception bonus
       if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) v += 12;
       score += (p.color === color) ? v : -v;
     }
@@ -1052,7 +1048,7 @@ function botNegamax(board, depth, alpha, beta, color, ply) {
   }
   if (depth <= 0) return botQuiesce(board, alpha, beta, color);
   const moves = allLegal(board, color);
-  if (!moves.length) return -9000 + ply; // no legal move = loss under this ruleset
+  if (!moves.length) return -9000 + ply;
   const ordered = botOrderMoves(board, moves, ttMove, depth);
   let best = -Infinity, bestMove = null;
   for (let i = 0; i < ordered.length; i++) {
@@ -1101,9 +1097,6 @@ function botSearchOnBoard(board, color, depth, timeMs, rootMoves) {
   }
   return {move: bestMove, score: bestScore};
 }
-// Chơi kiểu "Perfect Information Monte Carlo": mỗi lượt lấy vài thế giới giả định khác nhau
-// (quân úp được xáo ngẫu nhiên hợp lệ), tìm nước tốt nhất trong từng thế giới rồi bỏ phiếu chọn
-// nước được ủng hộ nhiều nhất — bot không còn "nhìn trộm" được quân úp thật sự là gì.
 function botChooseMove(board, color, captured, level) {
   const rootMoves = allLegal(board, color);
   if (!rootMoves.length) return null;
@@ -1291,26 +1284,26 @@ function playMoveSound() {
   const ctx = ensureAudio();
   if (!ctx) return;
   const t0 = ctx.currentTime;
-  noiseBurst(ctx, t0, 0.14, 0.7, 0.018);
-  beep(ctx, 120, t0, 0.12, "sine", 0.28);
-  beep(ctx, 70, t0, 0.16, "triangle", 0.22);
-  beep(ctx, 48, t0 + 0.02, 0.18, "sine", 0.16);
+  noiseBurst(ctx, t0, 0.14, 1.8, 0.025);
+  beep(ctx, 140, t0, 0.12, "sine", 0.6);
+  beep(ctx, 85, t0, 0.16, "triangle", 0.5);
+  beep(ctx, 55, t0 + 0.02, 0.18, "sine", 0.4);
 }
 function playCaptureSound() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
   if (!ctx) return;
   const t0 = ctx.currentTime;
-  noiseBurst(ctx, t0, 0.09, 0.38, 0.012);
-  beep(ctx, 1400, t0, 0.06, "sawtooth", 0.1);
-  beep(ctx, 900, t0 + 0.02, 0.07, "triangle", 0.08);
-  noiseBurst(ctx, t0 + 0.11, 0.09, 0.34, 0.012);
-  beep(ctx, 1200, t0 + 0.11, 0.06, "sawtooth", 0.09);
-  beep(ctx, 720, t0 + 0.14, 0.07, "triangle", 0.07);
-  beep(ctx, 220, t0 + 0.24, 0.22, "sawtooth", 0.1);
-  beep(ctx, 140, t0 + 0.28, 0.28, "sine", 0.12);
-  beep(ctx, 90, t0 + 0.34, 0.32, "triangle", 0.1);
-  beep(ctx, 60, t0 + 0.4, 0.36, "sine", 0.08);
+  noiseBurst(ctx, t0, 0.1, 0.8, 0.015);
+  beep(ctx, 1400, t0, 0.06, "sawtooth", 0.2);
+  beep(ctx, 900, t0 + 0.02, 0.07, "triangle", 0.18);
+  noiseBurst(ctx, t0 + 0.11, 0.1, 0.7, 0.015);
+  beep(ctx, 1200, t0 + 0.11, 0.06, "sawtooth", 0.18);
+  beep(ctx, 720, t0 + 0.14, 0.07, "triangle", 0.15);
+  beep(ctx, 220, t0 + 0.24, 0.22, "sawtooth", 0.25);
+  beep(ctx, 140, t0 + 0.28, 0.28, "sine", 0.3);
+  beep(ctx, 90, t0 + 0.34, 0.32, "triangle", 0.25);
+  beep(ctx, 60, t0 + 0.4, 0.36, "sine", 0.2);
 }
 function playCheckTune() {
   if (!sfxOn) return;
@@ -1417,12 +1410,16 @@ function playEndMusic(winner, reason) {
 function boardFlipped() { return !!(net && net.color === "red"); }
 function viewC(c) { return boardFlipped() ? 8 - c : c; }
 function viewR(r) { return boardFlipped() ? 9 - r : r; }
+
 function applyViewLayout() {
+  // Khôi phục logic chuẩn cho máy tính (Desktop), loại bỏ điều kiện isMobileUI ở đây
+  const shouldFlip = boardFlipped();
   const sc = document.querySelector(".side-clocks");
-  if (sc) sc.classList.toggle("flip", boardFlipped());
+  if (sc) sc.classList.toggle("flip", shouldFlip);
   const lc = document.querySelector(".left-col");
-  if (lc) lc.classList.toggle("flip", boardFlipped());
+  if (lc) lc.classList.toggle("flip", shouldFlip);
 }
+
 function cellFromEvent(ev) {
   const rect = canvas.getBoundingClientRect();
   const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
@@ -1526,7 +1523,6 @@ function drawPiece(p, c, r, checkedKing) {
   ctx.fillStyle = p.revealed ? "#f7ecd0" : "#5a3514";
   ctx.fill();
   if (isLastMoveTarget) {
-    // Nước đi mới nhất: bề mặt quân cờ nhấp nháy ánh xanh lá, mờ dần theo thời gian.
     ctx.beginPath();
     ctx.arc(x, y, rad, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(76,175,80," + (0.4 + 0.35 * pulse) * fade + ")";
@@ -1620,6 +1616,7 @@ document.getElementById("volSfx").oninput = function () {
   sfxVol = Math.max(0, Math.min(1, (this.value | 0) / 100));
   saveAudioPref();
 };
+
 const EMO = ["😄","😂","😎","😮","😡","😭","👍","👏","🔥","🐔","❤️","🤝"];
 let chatHideTimer = 0;
 let chatLogHideTimer = 0;
@@ -1715,6 +1712,7 @@ document.addEventListener("click", function () {
   document.getElementById("quickWrap").classList.remove("open");
   document.getElementById("soundWrap").classList.remove("open");
 });
+
 function hideDrawAsk() {
   const el = document.getElementById("drawAsk");
   if (el) el.classList.remove("show");
@@ -1791,6 +1789,7 @@ document.getElementById("btnResignYes").onclick = function () {
   }
   finish(loser === "red" ? "black" : "red", (loser === "red" ? "Đỏ" : "Đen") + " xin thua");
 };
+
 function updateReadyUI() {
   const gate = document.getElementById("readyGate");
   const btn = document.getElementById("btnReady");
@@ -1909,6 +1908,7 @@ function backToRoom() {
   if (started && state && !state.over) return;
   showLobby();
 }
+
 function loadAvatars() {
   try { return JSON.parse(localStorage.getItem("coupAvatars") || "{}"); }
   catch (e) { return {}; }
@@ -2006,6 +2006,7 @@ function paintSeats() {
       if (rk) rk.innerHTML = "—";
     }
   });
+  applyViewLayout();
 }
 function statsKey() {
   const id = net.account && (net.account.id || net.account.contact);
@@ -2078,6 +2079,7 @@ document.getElementById("btnProfClose").onclick = function () {
   const home = document.getElementById("homeAv");
   if (home && src) home.innerHTML = '<img alt="" src="' + src + '">';
 })();
+
 window.addEventListener("resize", function () { layout(); if (state) draw(); });
 renderModes();
 refreshSoundButtons();

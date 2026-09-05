@@ -1412,8 +1412,14 @@ function viewC(c) { return boardFlipped() ? 8 - c : c; }
 function viewR(r) { return boardFlipped() ? 9 - r : r; }
 
 function applyViewLayout() {
-  // Khôi phục logic chuẩn cho máy tính (Desktop), loại bỏ điều kiện isMobileUI ở đây
-  const shouldFlip = boardFlipped();
+  let shouldFlip = false;
+  if (isMobileUI()) {
+    // Cấu hình riêng cho Mobile: nếu trên điện thoại bị ngược ghế, đổi "red" thành "black"
+    shouldFlip = !!(net && net.color === "red");
+  } else {
+    // Cấu hình riêng cho Máy tính (Desktop): nếu trên máy tính bị ngược ghế, đổi "black" thành "red"
+    shouldFlip = !!(net && net.color === "red");
+  }
   const sc = document.querySelector(".side-clocks");
   if (sc) sc.classList.toggle("flip", shouldFlip);
   const lc = document.querySelector(".left-col");

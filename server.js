@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 8080;
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
+
 async function sendOtpMail(to, otp) {
   const from = process.env.MAIL_FROM || process.env.SMTP_USER || "noreply@co-up.local";
   const subject = "Ma OTP Co Up Tu Tien";
@@ -50,6 +51,7 @@ async function sendOtpMail(to, otp) {
   console.log("[OTP email chua cau hinh] " + to);
   throw new Error("chua-cau-hinh-email");
 }
+
 const ROOT = path.join(__dirname, "public");
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -79,10 +81,12 @@ function redirect(res, loc) {
   res.writeHead(302, { Location: loc, "Cache-Control": "no-store" });
   res.end();
 }
+
 function htmlPage(res, title, body) {
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
   res.end("<!doctype html><meta charset=utf-8><title>" + title + "</title><body style='font-family:sans-serif;background:#1e140c;color:#ffe082;padding:24px'>" + body + "</body>");
 }
+
 function findOrLinkOAuth(info) {
   const accs = loadAcc();
   let acc = accs.find((a) => a.provider === info.provider && a.providerId === info.providerId);
@@ -208,6 +212,7 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
 const rooms = new Map();
 store.ensureDir();
+
 function loadAcc() { return store.loadAcc(); }
 function saveAcc(list) { store.saveAcc(list); }
 function hashPass(p, salt) { return store.hashPass(p, salt); }
@@ -216,10 +221,18 @@ function norm(s) { return String(s || "").trim().toLowerCase(); }
 const NAME_RE = /^[A-Za-z0-9_]{6,24}$/;
 function validName(s) { return NAME_RE.test(String(s || "")); }
 const NAME_RULE_TEXT = "Tên 6-24 ký tự, chỉ chữ cái không dấu/số/gạch dưới, không khoảng trắng.";
+
 function publicProfile(ws) {
-  if (!ws || !ws.profile) return null;
-  return { id: ws.profile.id, name: ws.profile.name || "Đạo hữu" };
+  if (!ws) return { id: code(), name: "Đạo hữu" };
+  if (ws.profile && ws.profile.id) {
+    return { id: ws.profile.id, name: ws.profile.name || "Đạo hữu" };
+  }
+  if (ws.account && ws.account.id) {
+    return { id: ws.account.id, name: ws.account.name || "Đạo hữu" };
+  }
+  return { id: ws._id || (ws._id = code()), name: "Đạo hữu" };
 }
+
 function issueSession(ws) {
   const tok = store.token();
   ws.token = tok;
@@ -242,6 +255,7 @@ function send(ws, obj) {
   if (!live(ws)) return;
   try { ws.send(JSON.stringify(obj)); } catch (e) {}
 }
+
 function visibleGame(game, color, extra) {
   if (!game) return null;
   extra = extra || {};
@@ -262,6 +276,7 @@ function visibleGame(game, color, extra) {
     timeId: extra.timeId
   };
 }
+
 function sendGameSync(room) {
   if (!room || !room.game) return;
   const extra = {
@@ -280,36 +295,137 @@ function sendGameSync(room) {
   }));
 }
 
-// Thời gian chờ hồi kết nối tối đa 90s, nhưng rút ngắn theo thời gian còn lại thực tế
-// của người chơi đó (đang tới lượt thì khớp giờ nước đi, không thì bằng giờ nước đi tối đa
-// của họ + giờ nước đi còn lại của đối thủ, tức thời điểm sớm nhất tới lượt họ mà vẫn hết giờ).
-function awayGraceMs(room, color) {
-  const CAP = 90000, MIN = 15000;
-  if (!room.busy || !room.clocks) return CAP;
-  const tm = TIME[room.timeId || 3] || TIME[3];
-  const moveLeft = Math.max(0, room.clocks.moveLeft || 0);
-  const dyn = room.turn === color ? moveLeft : (tm.move + moveLeft);
-  return Math.max(MIN, Math.min(CAP, dyn));
+// Cưỡng bức dọn sạch mọi vết tích của người chơi khỏi tất cả các phòng cũ
+function purgeUserFromAllRooms(ws) {
+  if (!ws) return;
+  const tok = ws.token;
+  const accId = ws.account && ws.account.id;
+  const profId = ws.profile && ws.profile.id;
+
+  rooms.forEach((room, rId) => {
+    const had = (room.players || []).some(p => 
+      p.ws === ws || 
+      (tok && p.token === tok) || 
+      (accId && p.accountId === accId) || 
+      (profId && p.profileId === profId)
+    );
+
+    if (had) {
+      room.players = (room.players || []).filter(p => 
+        p.ws !== ws && 
+        (!tok || p.token !== tok) && 
+        (!accId || p.accountId !== accId) && 
+        (!profId || p.profileId !== profId)
+      );
+
+      if (!room.players.length) {
+        rooms.delete(rId);
+      } else {
+        if (!room.players.some(p => p.host)) room.players[0].host = true;
+        room.busy = false;
+        room.over = true;
+        room.game = null;
+        room.clocks = null;
+        room.players.forEach(p => { p.ready = false; });
+        seat(room);
+      }
+    }
+    room.specs = (room.specs || []).filter(s => s !== ws);
+  });
+  ws.roomId = null;
+}
+
+function restoreGameBoard(room, p, ws) {
+  const extra = {
+    started: true,
+    clocks: room.clocks,
+    timeId: room.timeId || 3,
+    turn: room.turn
+  };
+  const gView = visibleGame(room.game, p.color, extra);
+
+  send(ws, {
+    type: "start",
+    variant: room.variant || "up",
+    clocks: room.clocks,
+    turn: room.turn,
+    timeId: room.timeId || 3,
+    color: p.color,
+    isHost: !!p.host,
+    game: gView
+  });
+
+  send(ws, {
+    type: "resume-game",
+    clocks: room.clocks,
+    turn: room.turn,
+    timeId: room.timeId || 3,
+    game: gView
+  });
+
+  send(ws, {
+    type: "relay",
+    payload: { kind: "sync", game: gView }
+  });
+
+  room.players.forEach((other) => {
+    if (other.ws !== ws) {
+      send(other.ws, { type: "peer-back", count: room.players.length });
+    }
+  });
+  sendRoomState(room);
 }
 
 function pruneRoom(room) {
   if (!room) return false;
   const now = Date.now();
   let droppedAway = false;
+
   room.players = (room.players || []).filter((p) => {
-    if (live(p.ws)) { p.away = false; return true; }
-    if (room.busy && p.awaySince && now - p.awaySince < awayGraceMs(room, p.color)) return true;
-    if (p.away) droppedAway = true;
-    return false;
+    if (live(p.ws)) {
+      p.away = false;
+      p.awaySince = 0;
+      p.autoResignedAt = 0;
+      return true;
+    }
+
+    if (room.busy && !room.over) {
+      if (p.awaySince && now - p.awaySince < 120000) {
+        return true;
+      }
+      droppedAway = true;
+      return false;
+    }
+
+    const waitStart = p.autoResignedAt || room.finishedAt || p.awaySince;
+    if (waitStart && (now - waitStart > 40000)) {
+      droppedAway = true;
+      if (p.ws) {
+        try { p.ws.roomId = null; p.ws.terminate(); } catch (e) {}
+      }
+      return false;
+    }
+
+    return true;
   });
+
   room.specs = (room.specs || []).filter((s) => live(s));
+
   if (!room.players.length) {
-    rooms.delete(room.id);
-    return false;
+    if (!room.emptySince) room.emptySince = now;
+    if (now - room.emptySince > 120000) {
+      rooms.delete(room.id);
+      return false;
+    }
+  } else {
+    room.emptySince = null;
   }
-  if (!room.players.some((p) => p.host)) room.players[0].host = true;
+
+  if (!room.players.some((p) => p.host) && room.players.length > 0) {
+    room.players[0].host = true;
+  }
+
   if (droppedAway) {
-    // Hết hạn chờ hồi kết nối: gỡ cờ busy để người còn lại không bị treo mãi ở "Ván đang diễn ra".
     room.busy = false;
     room.over = true;
     room.game = null;
@@ -317,6 +433,7 @@ function pruneRoom(room) {
     room.players.forEach((p) => { p.ready = false; });
     room.version = (room.version || 0) + 1;
     room.players.forEach((p) => send(p.ws, { type: "peer-left", count: room.players.length }));
+    seat(room);
   }
   return true;
 }
@@ -330,7 +447,7 @@ function seat(room) {
   room.version = (room.version || 0) + 1;
   const profiles = {};
   room.players.forEach((p) => {
-    if (p.color) profiles[p.color] = publicProfile(p.ws);
+    if (p.color) profiles[p.color] = p.profile || publicProfile(p.ws);
   });
   room.players.forEach((p) => {
     send(p.ws, {
@@ -339,13 +456,15 @@ function seat(room) {
       color: p.color,
       isHost: !!p.host,
       count: room.players.length,
+      busy: !!room.busy,
       variant: room.variant || "up",
-      profile: publicProfile(p.ws),
+      profile: p.profile || publicProfile(p.ws),
       profiles: profiles,
       ready: !!p.ready,
       peerReady: room.players.some((x) => x.ws !== p.ws && x.ready)
     });
   });
+  sendRoomState(room);
 }
 
 function listPayload() {
@@ -364,6 +483,7 @@ function broadcastList() {
   const tables = listPayload();
   wss.clients.forEach((ws) => send(ws, { type: "tables", tables: tables }));
 }
+
 function presenceList() {
   const list = [];
   wss.clients.forEach((c) => {
@@ -378,6 +498,7 @@ function presenceList() {
   });
   return list;
 }
+
 function broadcastPresence() {
   const list = presenceList();
   wss.clients.forEach((ws) => send(ws, { type: "presence", n: list.length, list: list }));
@@ -386,6 +507,7 @@ function broadcastPresence() {
 function specCount(room) {
   return (room.specs || []).filter((s) => live(s)).length;
 }
+
 function sendSpecCount(room) {
   if (!room) return;
   const n = specCount(room);
@@ -393,6 +515,7 @@ function sendSpecCount(room) {
   room.players.forEach((p) => send(p.ws, payload));
   (room.specs || []).forEach((s) => send(s, payload));
 }
+
 function sendRoomState(room) {
   if (!room) return;
   room.players.forEach((p) => send(p.ws, {
@@ -406,15 +529,11 @@ function sendRoomState(room) {
     peerReady: room.players.some((x) => x.ws !== p.ws && x.ready)
   }));
 }
+
 function leaveRoom(ws, silent) {
   const roomId = ws.roomId;
   const wasSpec = !!(ws.spectate);
-  rooms.forEach((room) => {
-    room.players = (room.players || []).filter((p) => p.ws !== ws);
-    room.specs = (room.specs || []).filter((s) => s !== ws);
-  });
-  ws.roomId = null;
-  ws.spectate = false;
+  purgeUserFromAllRooms(ws);
   pruneAll();
   if (!roomId || !rooms.has(roomId)) {
     broadcastList();
@@ -422,8 +541,6 @@ function leaveRoom(ws, silent) {
     return;
   }
   const room = rooms.get(roomId);
-  room.players = room.players.filter((p) => p.ws !== ws);
-  room.specs = (room.specs || []).filter((s) => s !== ws);
   if (!pruneRoom(room)) {
     broadcastList();
     broadcastPresence();
@@ -432,7 +549,6 @@ function leaveRoom(ws, silent) {
   if (wasSpec) {
     sendSpecCount(room);
   } else {
-    // Người rời phòng khiến ván treo ở trạng thái "busy": xóa cờ để bàn còn lại có thể sẵn sàng lại.
     room.busy = false;
     room.over = true;
     room.game = null;
@@ -450,7 +566,13 @@ function leaveRoom(ws, silent) {
 }
 
 function roomOf(ws) {
-  return ws.roomId ? rooms.get(ws.roomId) : null;
+  if (!ws || !ws.roomId) return null;
+  const r = rooms.get(ws.roomId);
+  if (!r) {
+    ws.roomId = null;
+    return null;
+  }
+  return r;
 }
 
 function initClocks(room) {
@@ -465,8 +587,14 @@ function finishRoom(room, winner, reason) {
   if (!room || room.over) return;
   room.over = true;
   room.busy = false;
+  room.lastWinner = winner;
+  room.lastReason = reason;
+  room.finishedAt = Date.now();
   room.version = (room.version || 0) + 1;
-  room.players.forEach((p) => { p.ready = false; });
+  room.players.forEach((p) => { 
+    p.ready = false; 
+    if (p.away) p.autoResignedAt = Date.now();
+  });
   const payload = { type: "relay", payload: { kind: "finish", winner: winner, reason: reason } };
   const accs = loadAcc();
   let dirty = false;
@@ -495,6 +623,11 @@ function finishRoom(room, winner, reason) {
     timeId: room.timeId || 3,
     names: room.players.map((p) => (p.ws && p.ws.profile && p.ws.profile.name) || p.color)
   });
+
+  // Hủy triệt để trạng thái cờ cũ để không lưu rác sang ván mới
+  room.game = null;
+  room.clocks = null;
+
   broadcastList();
   sendRoomState(room);
 }
@@ -508,8 +641,10 @@ setInterval(function () {
     const turn = room.turn || "red";
     room.clocks[turn] = Math.max(0, (room.clocks[turn] || 0) - dt);
     room.clocks.moveLeft = Math.max(0, (room.clocks.moveLeft || 0) - dt);
+
     if (room.clocks[turn] <= 0 || room.clocks.moveLeft <= 0) {
-      finishRoom(room, turn === "red" ? "black" : "red", "Hết giờ");
+      const winner = turn === "red" ? "black" : "red";
+      finishRoom(room, winner, (turn === "red" ? "Đỏ" : "Đen") + " hết giờ (Tự động xin thua)");
     }
   });
 }, 250);
@@ -537,10 +672,20 @@ function assignColorsAndJoin(room, ws) {
   if (room.players[0] && !room.players[0].color) {
     room.players[0].color = color === "red" ? "black" : "red";
   }
-  room.players.push({ ws, host: false, color: color });
+  const prof = publicProfile(ws);
+  room.players.push({ 
+    ws, 
+    host: false, 
+    color: color, 
+    token: ws.token, 
+    ready: false,
+    profile: prof,
+    profileId: prof.id,
+    accountId: ws.account && ws.account.id
+  });
   ws.roomId = room.id;
   ws.spectate = false;
-  send(ws, { type: "joined", room: room.id, color: color, count: room.players.length, variant: room.variant || "up", profile: publicProfile(ws), ready: false, peerReady: false });
+  send(ws, { type: "joined", room: room.id, color: color, count: room.players.length, variant: room.variant || "up", profile: prof, ready: false, peerReady: false });
   seat(room);
   broadcastList();
 }
@@ -564,49 +709,103 @@ wss.on("connection", (ws) => {
       send(ws, { type: "error", text: "Gửi quá nhanh. Vui lòng thử lại sau." });
       return;
     }
+
     let msg;
-    try { msg = JSON.parse(String(raw)); } catch (e) { return; }
+    try { 
+      msg = JSON.parse(String(raw)); 
+    } catch (e) { 
+      return;
+    }
+    if (!msg || typeof msg !== "object") return;
 
     if (msg.type === "resume") {
-      const old = sessions.get(String(msg.token || ""));
-      if (!old || old === ws) return;
-      ws.account = old.account;
-      ws.profile = old.profile;
-      ws.token = old.token;
+      const targetToken = String(msg.token || "");
+      const old = sessions.get(targetToken);
+      if (old && old !== ws) {
+        ws.account = old.account;
+        ws.profile = old.profile;
+        ws.token = old.token;
+      } else if (targetToken) {
+        ws.token = targetToken;
+      }
       sessions.set(ws.token, ws);
+
       let found = null;
       rooms.forEach((room) => {
         room.players.forEach((p) => {
-          if (p.token === ws.token || p.ws === old) {
+          if (p.token === ws.token || (old && (p.token === old.token || p.ws === old))) {
             p.ws = ws;
+            p.token = ws.token;
             p.away = false;
             p.awaySince = 0;
+            p.autoResignedAt = 0;
+            if (p.profile) ws.profile = p.profile;
             ws.roomId = room.id;
-            found = { room, color: p.color, host: !!p.host };
+            found = { room, player: p, color: p.color, host: !!p.host };
           }
         });
       });
+
       send(ws, { type: "session", token: ws.token, account: ws.account ? pubAcc(ws.account) : null });
+
       if (found) {
-        send(ws, { type: "joined", room: found.room.id, color: found.color, count: found.room.players.length, variant: found.room.variant || "up", profile: publicProfile(ws) });
-        if (found.room.busy && found.room.clocks) {
-          send(ws, { type: "resume-game", clocks: found.room.clocks, turn: found.room.turn, timeId: found.room.timeId || 3, game: visibleGame(found.room.game, found.color) });
+        // Nếu ván vẫn đang diễn ra thực sự -> Cho chơi tiếp
+        if (found.room.busy && !found.room.over && found.room.game && found.room.clocks) {
+          send(ws, { 
+            type: "joined", 
+            room: found.room.id, 
+            color: found.color, 
+            count: found.room.players.length, 
+            variant: found.room.variant || "up", 
+            profile: publicProfile(ws) 
+          });
+          restoreGameBoard(found.room, found.player, ws);
+        } else {
+          // Nếu ván ĐÃ HẾT GIỜ / ĐÃ XỬ THUA trong lúc vắng mặt:
+          // Bắt buộc gửi finish để client giải phóng trạng thái cờ cũ, mở khóa nút Sẵn sàng!
+          send(ws, {
+            type: "relay",
+            payload: { 
+              kind: "finish", 
+              winner: found.room.lastWinner || "draw", 
+              reason: found.room.lastReason || "Hết giờ" 
+            }
+          });
+          found.room.busy = false;
+          found.room.over = false;
+          found.room.game = null;
+          found.room.clocks = null;
+          found.room.players.forEach(p => { p.ready = false; p.away = false; });
+          
+          send(ws, { 
+            type: "joined", 
+            room: found.room.id, 
+            color: found.color, 
+            count: found.room.players.length, 
+            variant: found.room.variant || "up", 
+            profile: publicProfile(ws) 
+          });
+          seat(found.room);
         }
-        seat(found.room);
       } else {
-        // Báo cho client biết phiên tài khoản vẫn hợp lệ nhưng bàn cũ đã hết hạn chờ/không còn,
-        // để họ tự về trang chính thay vì đứng treo ở màn hình bàn cờ cũ.
+        // Nếu phòng cũ đã bị xóa sau 40s: Gửi finish dập tắt cờ treo trên client rồi đưa về sảnh
+        ws.roomId = null;
+        send(ws, {
+          type: "relay",
+          payload: { kind: "finish", winner: "draw", reason: "Ván đấu cũ đã kết thúc" }
+        });
         send(ws, { type: "resume-none" });
       }
       return;
     }
 
     if (msg.type === "create") {
-      if (roomOf(ws)) leaveRoom(ws, true);
+      purgeUserFromAllRooms(ws);
       let id = String(msg.name || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
       if (id && rooms.has(id)) { send(ws, { type: "error", text: "Tên phòng đã tồn tại" }); return; }
       if (!id) id = code();
       const password = String(msg.password || "").trim();
+      const prof = publicProfile(ws);
       const room = {
         id,
         password: password || "",
@@ -614,25 +813,34 @@ wss.on("connection", (ws) => {
         specs: [],
         variant: msg.variant === "tuong" ? "tuong" : "up",
         version: 0,
-        players: [{ ws, host: true, color: "red" }]
+        players: [{ 
+          ws, 
+          host: true, 
+          color: "red", 
+          token: ws.token, 
+          ready: false,
+          profile: prof,
+          profileId: prof.id,
+          accountId: ws.account && ws.account.id
+        }]
       };
       rooms.set(id, room);
       ws.roomId = id;
-      send(ws, { type: "created", room: id, password: !!password, variant: room.variant, color: "red", profile: publicProfile(ws) });
+      send(ws, { type: "created", room: id, password: !!password, variant: room.variant, color: "red", profile: prof });
       broadcastList();
       return;
     }
 
     if (msg.type === "play") {
+      purgeUserFromAllRooms(ws);
       const variant = msg.variant === "tuong" ? "tuong" : "up";
       const target = findWaiting(ws, variant);
       if (target) {
-        if (roomOf(ws)) leaveRoom(ws, true);
         assignColorsAndJoin(target, ws);
         return;
       }
-      if (roomOf(ws)) leaveRoom(ws, true);
       const id = code();
+      const prof = publicProfile(ws);
       const room = {
         id,
         password: "",
@@ -640,11 +848,20 @@ wss.on("connection", (ws) => {
         specs: [],
         variant: variant,
         version: 0,
-        players: [{ ws, host: true, color: "red" }]
+        players: [{ 
+          ws, 
+          host: true, 
+          color: "red", 
+          token: ws.token, 
+          ready: false,
+          profile: prof,
+          profileId: prof.id,
+          accountId: ws.account && ws.account.id
+        }]
       };
       rooms.set(id, room);
       ws.roomId = id;
-      send(ws, { type: "created", room: id, password: false, waiting: true, variant: variant, color: "red", profile: publicProfile(ws) });
+      send(ws, { type: "created", room: id, password: false, waiting: true, variant: variant, color: "red", profile: prof });
       broadcastList();
       return;
     }
@@ -656,11 +873,47 @@ wss.on("connection", (ws) => {
       if (!room) { send(ws, { type: "error", text: "Không có phòng này hoặc phòng đã trống" }); return; }
       if (!pruneRoom(room)) { send(ws, { type: "error", text: "Phòng đã trống và bị xóa" }); broadcastList(); return; }
 
-      const already = room.players.find((p) => p.ws === ws);
+      let already = room.players.find((p) => 
+        p.ws === ws || 
+        (p.token && (p.token === ws.token || (msg.token && p.token === msg.token))) ||
+        (ws.account && p.accountId && p.accountId === ws.account.id) ||
+        (ws.profile && p.profileId && p.profileId === ws.profile.id)
+      );
+
       if (already) {
+        already.ws = ws;
+        already.token = ws.token;
+        already.away = false;
+        already.awaySince = 0;
+        already.autoResignedAt = 0;
+        if (already.profile) ws.profile = already.profile;
         ws.roomId = room.id;
-        send(ws, { type: "joined", room: room.id, color: already.color, count: room.players.length, variant: room.variant || "up", profile: publicProfile(ws) });
-        seat(room);
+        ws.spectate = false;
+
+        send(ws, { 
+          type: "joined", 
+          room: room.id, 
+          color: already.color, 
+          count: room.players.length, 
+          variant: room.variant || "up", 
+          profile: publicProfile(ws) 
+        });
+
+        if (room.busy && !room.over && room.game && room.clocks) {
+          restoreGameBoard(room, already, ws);
+        } else {
+          // Dập tắt cờ cũ và mở khóa phòng chờ
+          send(ws, {
+            type: "relay",
+            payload: { kind: "finish", winner: room.lastWinner || "draw", reason: room.lastReason || "Kết thúc" }
+          });
+          room.busy = false;
+          room.over = false;
+          room.game = null;
+          room.clocks = null;
+          room.players.forEach(p => { p.ready = false; });
+          seat(room);
+        }
         return;
       }
 
@@ -686,7 +939,7 @@ wss.on("connection", (ws) => {
         return;
       }
 
-      if (ws.roomId && ws.roomId !== room.id) leaveRoom(ws, true);
+      purgeUserFromAllRooms(ws);
       assignColorsAndJoin(room, ws);
       return;
     }
@@ -708,9 +961,10 @@ wss.on("connection", (ws) => {
         send(ws, { type: "error", text: "Ván đang diễn ra." });
         return;
       }
-      const me = rr.players.find((p) => p.ws === ws);
+      const me = rr.players.find((p) => p.ws === ws || (p.token && p.token === ws.token));
       if (!me) return;
-      me.ready = !!msg.on;
+      me.ws = ws;
+      me.ready = msg.on !== undefined ? !!msg.on : !me.ready;
       rr.version = (rr.version || 0) + 1;
       rr.players.forEach((p) => send(p.ws, {
         type: "ready-state",
@@ -719,6 +973,7 @@ wss.on("connection", (ws) => {
         peer: rr.players.some((x) => x.ws !== p.ws && x.ready),
         timeId: rr.timeId || 3
       }));
+      sendRoomState(rr);
       return;
     }
 
@@ -811,8 +1066,7 @@ wss.on("connection", (ws) => {
       if (!validName(next)) { send(ws, { type: "error", text: NAME_RULE_TEXT }); return; }
       const accs = loadAcc();
       if (accs.some((a) => a.id !== ws.account.id && norm(a.name) === norm(next))) {
-        send(ws, { type: "error", text: "Tên đã có người dùng." }); return;
-      }
+        send(ws, { type: "error", text: "Tên đã có người dùng." }); return; }
       const acc = accs.find((a) => a.id === ws.account.id);
       if (!acc) return;
       acc.name = next;
@@ -854,7 +1108,7 @@ wss.on("connection", (ws) => {
         return;
       }
       const hp = store.hashPass(pass);
-      const acc = { id: code() + code(), name, contact, via, salt: hp.salt, hash: hp.hash, pts: 0, renamedAt: 0, av: "", stats: {games:0,wins:0,losses:0,draws:0} };
+      const acc = { id: code() + code(), name, contact, via, salt: hp.salt, hash: hp.hash, pts: 0, renamedAt: 0, av: "", stats: { games: 0, wins: 0, losses: 0, draws: 0 } };
       accs.push(acc);
       saveAcc(accs);
       ws.account = acc;
@@ -1039,15 +1293,13 @@ wss.on("connection", (ws) => {
     if (msg.type === "invite") {
       if (!ws.account) { send(ws, { type: "error", text: "Cần đăng nhập tài khoản để gửi lời mời." }); return; }
       if (ws.profile && String(msg.to) === String(ws.profile.id)) {
-        send(ws, { type: "error", text: "Không thể tự mời mình." }); return;
-      }
+        send(ws, { type: "error", text: "Không thể tự mời mình." }); return; }
       const target = Array.from(wss.clients).find((c) => c.profile && c.profile.id === msg.to);
       if (!target || !live(target)) { send(ws, { type: "error", text: "Người chơi không online." }); return; }
       if (!target.account) { send(ws, { type: "error", text: "Đối phương chưa đăng nhập tài khoản." }); return; }
       if (target.blockInvite) { send(ws, { type: "error", text: "Người này đang chặn lời mời." }); return; }
       if (target.roomId && rooms.get(target.roomId) && rooms.get(target.roomId).busy) {
-        send(ws, { type: "error", text: "Người này đang trong ván đấu." }); return;
-      }
+        send(ws, { type: "error", text: "Người này đang trong ván đấu." }); return; }
       send(target, {
         type: "invite",
         fromId: ws.profile && ws.profile.id,
@@ -1060,13 +1312,29 @@ wss.on("connection", (ws) => {
     if (msg.type === "invite-ok") {
       const from = Array.from(wss.clients).find((c) => c.profile && c.profile.id === msg.fromId);
       if (!from || !live(from)) { send(ws, { type: "error", text: "Người mời đã offline." }); return; }
-      if (roomOf(from)) leaveRoom(from, true);
-      if (roomOf(ws)) leaveRoom(ws, true);
+      purgeUserFromAllRooms(from);
+      purgeUserFromAllRooms(ws);
       const id = code();
-      const room = { id, password: "", busy: false, specs: [], players: [{ ws: from, host: true, color: "red" }] };
+      const fProf = publicProfile(from);
+      const room = { 
+        id, 
+        password: "", 
+        busy: false, 
+        specs: [], 
+        players: [{ 
+          ws: from, 
+          host: true, 
+          color: "red", 
+          token: from.token, 
+          ready: false,
+          profile: fProf,
+          profileId: fProf.id,
+          accountId: from.account && from.account.id
+        }] 
+      };
       rooms.set(id, room);
       from.roomId = id;
-      send(from, { type: "created", room: id, password: false, variant: room.variant || "up", color: "red", profile: publicProfile(from) });
+      send(from, { type: "created", room: id, password: false, variant: room.variant || "up", color: "red", profile: fProf });
       assignColorsAndJoin(room, ws);
       return;
     }
@@ -1087,7 +1355,6 @@ wss.on("connection", (ws) => {
       if (pld.kind === "chat") {
         const text = String(pld.text || "").trim().slice(0, 80);
         if (!text) return;
-        // Chong spam: toi da 1 tin/10s cho moi nguoi choi, vuot thi lang le bo qua.
         const now = Date.now();
         if (ws.lastChatAt && now - ws.lastChatAt < 10000) return;
         ws.lastChatAt = now;
@@ -1156,7 +1423,11 @@ wss.on("connection", (ws) => {
     const room = roomOf(ws);
     if (room && room.busy && !room.over) {
       const me = room.players.find((p) => p.ws === ws);
-      if (me) { me.away = true; me.awaySince = Date.now(); me.token = ws.token; }
+      if (me) { 
+        me.away = true; 
+        me.awaySince = Date.now(); 
+        me.token = ws.token; 
+      }
       room.players.forEach((p) => {
         if (p.ws !== ws) send(p.ws, { type: "peer-away", count: room.players.length });
       });
@@ -1181,6 +1452,7 @@ const beat = setInterval(() => {
   broadcastList();
   broadcastPresence();
 }, 15000);
+
 wss.on("close", () => clearInterval(beat));
 
 server.listen(PORT, () => {

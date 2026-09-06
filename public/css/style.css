@@ -292,24 +292,207 @@ body:has(#loginGate.show) #gameWrap { display: none !important; }
 #profilePop { z-index: 31; }
 #authPop { z-index: 23; }
 #leavePop.show, #resignPop.show, #authPop.show, #invitePop.show, #profilePop.show { display: flex; }
-
+/* Lớp phủ toàn màn hình cho cổng đăng nhập (nổi đè lên sảnh hub z-index 17) */
 #loginGate {
-  display: none; position: fixed; inset: 0; z-index: 30;
-  background: rgba(12,8,4,.78);
-  align-items: center; justify-content: center;
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(12, 8, 4, 0.78);
+  align-items: center;
+  justify-content: center;
 }
-#loginGate.show { display: flex; }
+
+#loginGate.show {
+  display: flex !important;
+}
+/* 1. Ẩn viền khung login, giữ bóng đổ sâu tạo chiều sâu không gian */
 .login-card {
-  width: min(360px, 92vw); text-align: center;
-  background: #2a1d12; border: 1px solid #c4a574; border-radius: 18px;
-  padding: 22px 20px 18px; box-shadow: 0 16px 40px #0009;
+  width: min(360px, 92vw);
+  text-align: center;
+  background: rgba(35, 23, 14, 0.94); /* Nền gỗ mun sẫm màu */
+  border: none !important;            /* Đã ẩn sạch khung viền */
+  border-radius: 20px;
+  padding: 102px 22px 20px;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  font-size: 0.76rem;         /* Giảm kích thước chữ (mặc định trình duyệt ~1rem, bạn có thể chỉnh 0.72rem - 0.8rem) */
+  color: #0bc7e4;             /* Làm dịu bớt sắc độ chữ để làm nổi bật cụm quân cờ và nút bấm */  
+  line-height: 1.4;           /* Khoảng cách dòng vừa vặn, không bị thưa */
+  margin: 6px auto 10px;      /* Cân đối khoảng cách trên (cách quân cờ) và dưới (cách nút đầu tiên) */
+  max-width: 90%;             /* Giúp câu chữ gom dòng gọn gàng ở giữa */
 }
-.login-mark { font-size: 2rem; margin-bottom: 6px; }
-.login-card h1 { margin: 0 0 8px; color: #ffe082; font-size: 1.35rem; letter-spacing: .06em; }
-.login-card button { width: 100%; margin: 7px 0; padding: 11px 12px; border-radius: 10px; font-size: .95rem; }
-.login-guest { background: #5d4037; }
-.login-google { background: #c62828; }
-.login-fb { background: #1565c0; }
+/* 2. Cụm quân cờ gỗ & ngọc thạch anh 3D rải rác ngổn ngang một cách tự nhiên */
+.chess-cluster {
+  position: relative;
+  width: 40px;
+  height: 46px;
+  margin: -60px auto 14px; /* Cách chữ tiêu đề 30px và cách dòng mô tả phía dưới 40px */
+  pointer-events: none;
+
+  position: relative;
+  width: 250px;
+  height: 68px;
+  margin: 0 auto 14px;
+  pointer-events: none;
+}
+.cluster-piece {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "KaiTi", "STKaiti", "FangSong", serif;
+  font-weight: 800;
+  font-size: 24px;
+  transition: transform 0.2s ease;
+}
+
+/* Quân gỗ đỏ nghiêng trái */
+.cluster-piece.wood-red {
+  left: 6px;
+  top: 14px;
+  transform: rotate(-18deg);
+  background: radial-gradient(circle at 35% 30%, #f6e7c4, #d2a45a 70%, #8a5a18);
+  color: #471189;
+  border: 1px solid #c49a45;
+  box-shadow: -3px 4px 0 #543308, 0 8px 14px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.6);
+  z-index: 1;
+}
+
+/* Quân cờ Úp Thạch Anh nằm đè ở giữa (phát quang huyền bí) */
+.cluster-piece.quartz-up {
+  left: 46px;
+  top: 4px;
+  width: 85px;
+  height: 85px;
+  transform: rotate(14deg) scale(1.05);
+  background: radial-gradient(circle at 30% 25%, #888a8a 0%, #282028 50%, #8f908f 90%);
+  border: 1.5px solid rgba(246, 4, 93, 0.7);
+  box-shadow: 0 5px 0 #075d2c, 0 0 16px rgb(250, 1, 51), inset 0 3px 6px rgba(5, 0, 243, 0.966);
+  z-index: 3;
+}
+
+/* Quân gỗ vàng kim nghiêng phải */
+.cluster-piece.wood-black {
+  right: 6px;
+  top: 14px;
+  transform: rotate(24deg);
+  background: radial-gradient(circle at 35% 30%, #b78d2b, #c18b35 70%, #5b3808);
+  color: #45351ec9;
+  border: 1px solid #500780;
+  box-shadow: 3px 4px 0 #3513b0, 0 8px 14px rgba(215, 9, 9, 0.6), inset 0 2px 4px rgba(174, 22, 22, 0.6);
+  z-index: 2;
+}
+
+/* 3. Tiêu đề "Cờ Úp Tu Tiên" chữ xanh ngọc trang 3D nổi bật */
+.login-card h1 {
+/* Kết hợp nhấc chữ lên trên và xoay */
+  transform: translateY(-35px);
+  display: inline-block; /* Giúp tâm xoay nằm chuẩn ngay chính giữa cụm chữ */
+  margin: 0 0 6px;
+  font-family: "Palatino Linotype", "Times New Roman", serif;
+  font-size: 3.6rem;
+  font-weight: 1400;
+  letter-spacing: 0.3em;
+  color: #5203f135;
+  /* Đổ bóng tầng 3D kết hợp hào quang kim quang */
+  text-shadow: 
+    -3px 0 #beccc2,
+    0 2px 0 #92051d,
+    0 0px 0 #fc024d,
+    0 -2px 2px rgba(252, 236, 11, 0.957),
+    0 0 3px rgb(158, 159, 160);
+}
+/* Nền tảng nút khối Ngọc Thạch 3D */
+.login-card button{
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  margin: 7.5px 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  outline: none;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.7);
+  transition: transform 0.5s ease, box-shadow 0.25s ease, filter 1.12s ease;
+}
+
+/* Hiệu ứng tia sáng lấp lánh quét qua ngọc thạch */
+.login-card button::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -70%;
+  width: 45%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgb(72, 3, 77), transparent);
+  transform: rotate(28deg);
+  animation: gemShimmer 3.6s infinite ease-in-out;
+  pointer-events: none;
+}
+
+/* Lệch nhịp phát sáng giữa các nút để tạo hiệu ứng tự nhiên */
+.login-guest::after { animation-delay: 0s; }
+.login-google::after { animation-delay: 1.2s; }
+.login-fb::after { animation-delay: 2.4s; }
+
+@keyframes gemShimmer {
+  0% { left: -70%; }
+  22%, 100% { left: 150%; }
+}
+
+/* Tương tác rê chuột (hover) và nhấn lún 3D (active) */
+.login-card button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+.login-card button:active {
+  transform: translateY(3px);
+  filter: brightness(0.95);
+}
+
+/* 1. Hổ Phách / Huyền Ngọc (Nút Khách) */
+.login-guest {
+  background: linear-gradient(180deg, #271c18 0%, #521807 60%, #46140b 100%);
+  box-shadow: 0 5px 0 #55382c, 0 8px 12px rgba(85, 3, 3, 0.26);
+}
+.login-guest:hover {
+  box-shadow: 0 7px 0 #0307ff, 0 10px 16px rgba(11, 2, 254, 0.957);
+}
+.login-guest:active {
+  box-shadow: 0 2px 0 #610345, 0 3px 6px rgba(99, 4, 48, 0.4);
+}
+
+/* 2. Chu Sa / Huyết Ngọc (Nút Google) */
+.login-google {
+  background: linear-gradient(180deg, hsla(0, 97%, 25%, 0.648) 0%, #950606 60%, #6d0606 100%);
+  box-shadow: 0 5px 0 #02371b, 0 8px 15px rgba(6, 39, 21, 0.45);
+}
+.login-google:hover {
+  box-shadow: 0 7px 0 #410303, 0 11px 18px rgba(66, 2, 86, 0.6);
+}
+.login-google:active {
+  box-shadow: 0 2px 0 #520606, 0 3px 6px rgba(57, 3, 57, 0.4);
+}
+
+/* 3. Lục Ngọc / Bích Tinh (Nút Facebook) */
+.login-fb {
+  background: linear-gradient(180deg, #05621c 0%, #0a722b 60%, #0a4c18 100%);
+  box-shadow: 0 5px 0 #06640b, 0 8px 15px rgba(7, 157, 12, 0.45);
+}
+.login-fb:hover {
+  box-shadow: 0 7px 0 #1d0248, 0 11px 18px rgba(33, 150, 243, 0.6);
+}
+.login-fb:active {
+  box-shadow: 0 2px 0 #670444, 0 3px 6px rgba(0, 0, 0, 0.4);
+}
 #newProfileName { width: 86%; padding: 8px; border-radius: 8px; border: 0; margin: 8px 0 12px; }
 
 /* Sảnh Bàn Chơi (Hall) */
@@ -328,7 +511,7 @@ body:has(#loginGate.show) #gameWrap { display: none !important; }
 #hallStrip:active { cursor: grabbing; }
 .tbl {
   min-width: 210px; max-width: 210px; height: 260px;
-  background: #2a1d12; border: 1px solid #5c4030; border-radius: 12px;
+  background: #582e0b52; border: 1px solid #5c4030; border-radius: 12px;
   padding: 12px; flex: 0 0 auto; text-align: center;
 }
 .tbl.mine { border-color: #ffe082; }
@@ -340,14 +523,14 @@ body:has(#loginGate.show) #gameWrap { display: none !important; }
 .player { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .av-wrap { position: relative; width: 62px; height: 62px; }
 .av-ring { position: absolute; inset: 0; width: 62px; height: 62px; transform: rotate(-90deg); }
-.av-ring .track { fill: none; stroke: #3a2a1a; stroke-width: 5; }
+.av-ring .track { fill: none; stroke: #3f2205; stroke-width: 5; }
 .av-ring .prog {
-  fill: none; stroke: #80cbc4; stroke-width: 5;
+  fill: none; stroke: #0d5637; stroke-width: 5;
   stroke-linecap: round; stroke-dasharray: 201; stroke-dashoffset: 0;
   transition: stroke-dashoffset .2s linear, stroke .2s;
 }
-.av-wrap.on .prog { stroke: #ffe082; animation: ringblink .45s ease-in-out infinite alternate; will-change: filter, opacity; }
-.av-wrap.warn .prog { stroke: #ff5252; animation: ringblink .35s ease-in-out infinite alternate; will-change: filter, opacity; }
+.av-wrap.on .prog { stroke: #6e5405; animation: ringblink .45s ease-in-out infinite alternate; will-change: filter, opacity; }
+.av-wrap.warn .prog { stroke: #7d0b0b; animation: ringblink .35s ease-in-out infinite alternate; will-change: filter, opacity; }
 @keyframes ringblink {
   from { filter: drop-shadow(0 0 1px #ffe082); opacity: 1; }
   to { filter: drop-shadow(0 0 8px #ffca28); opacity: .72; }

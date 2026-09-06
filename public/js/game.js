@@ -1231,7 +1231,16 @@ function botPlay() {
   const level = botAdaptLevel(BOT_LEVELS[levelKey] || BOT_LEVELS.normal, levelKey);
   let timeMs = level.timeMs;
   if (clocks && typeof clocks.moveLeft === "number") timeMs = Math.max(150, Math.min(timeMs, clocks.moveLeft * 0.6));
+
+  const t0 = performance.now();
   const pick = botChooseMove(state.board, color, state.captured, Object.assign({}, level, {timeMs: timeMs}));
+  const thinkTime = performance.now() - t0;
+
+  // Trừ trực tiếp thời gian Bot vừa dùng để suy nghĩ vào đồng hồ ván của Bot
+  if (clocks && clocks[color]) {
+    clocks[color] = Math.max(0, clocks[color] - thinkTime);
+  }
+
   if (!pick) return;
   applyMove(pick, true);
 }

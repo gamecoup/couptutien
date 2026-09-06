@@ -142,13 +142,13 @@
     </div>
     <div class="home-music">
       <button id="btnHomeMusic" type="button" aria-label="Bật/Tắt nhạc nền trang chính">🎵</button>
-      <input type="range" id="volHome" min="0" max="100" value="35" title="Nhạc trang chính">
+      <input type="range" id="volHome" min="0" max="100" value="35" title="Nhạc trang chính" aria-label="Âm lượng nhạc nền trang chính">
     </div>
     <div class="home-row">
       <div class="home-side">
         <h2>Tìm đạo hữu</h2>
         <div id="findBox">
-          <input id="findName" placeholder="Nhập đúng tên đạo hữu đang online" maxlength="24">
+          <input id="findName" placeholder="Nhập đúng tên đạo hữu đang online" maxlength="24" aria-label="Tên đạo hữu cần tìm">
           <button id="btnFind" type="button">Tìm</button>
         </div>
         <div id="findList"></div>
@@ -174,10 +174,51 @@
         <div id="authBtns">
           <button id="btnLogout" class="secondary" type="button" style="display:none">Đăng xuất</button>
         </div>
-        <button id="btnVsBot" type="button">
-          <div class="hero-art">🤖 ♟️</div>
-          <div>CHƠI VỚI MÁY</div>
-          <div class="hero-sub">Bạn là chủ bàn · tỷ thí với bot</div>
+        <button id="btnVsBot" class="btn-vs-bot" type="button">
+          <div class="bot-hero-art" aria-hidden="true">
+            <!-- Quân Tướng Đỏ -->
+            <div class="disc-deco disc-left">帥</div>
+
+            <!-- Robot đang suy ngẫm (Bánh răng xoay + Tia ý nghĩ) -->
+            <div class="bot-thinking">
+              <svg class="thought-sparkle" viewBox="0 0 24 24">
+                <path d="M12 2L13.5 7.5L19 9L13.5 10.5L12 16L10.5 10.5L5 9L10.5 7.5L12 2Z" fill="#ffe082"/>
+              </svg>
+              <svg class="bot-face" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Anten & Đèn phát sáng -->
+                <line x1="32" y1="12" x2="32" y2="4" stroke="#ffe082" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="32" cy="4" r="3.5" fill="#ffd54f"/>
+                
+                <!-- Đầu Robot -->
+                <rect x="12" y="12" width="40" height="34" rx="10" fill="url(#botHeadGrad)" stroke="#ffe082" stroke-width="2.5"/>
+                <rect x="7" y="24" width="5" height="10" rx="2" fill="#d7ccc8"/>
+                <rect x="52" y="24" width="5" height="10" rx="2" fill="#d7ccc8"/>
+                
+                <!-- Màn hình mắt -->
+                <rect x="18" y="19" width="28" height="16" rx="6" fill="#120c08"/>
+                <!-- Mắt đang tính toán (LED xanh) -->
+                <circle class="bot-eye eye-l" cx="25" cy="27" r="3" fill="#80cbc4"/>
+                <circle class="bot-eye eye-r" cx="39" cy="27" r="3" fill="#80cbc4"/>
+                
+                <!-- Miệng mạch điện tử -->
+                <path d="M24 39H40" stroke="#8d6e63" stroke-width="2" stroke-linecap="round"/>
+                
+                <defs>
+                  <linearGradient id="botHeadGrad" x1="12" y1="12" x2="52" y2="46" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#5d4037"/>
+                    <stop offset="1" stop-color="#3e2723"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <!-- Bánh răng xoay biểu thị suy ngẫm -->
+              <div class="gear-cog">⚙</div>
+            </div>
+
+            <!-- Quân Tướng Đen -->
+            <div class="disc-deco disc-right">將</div>
+          </div>
+          <div class="hero-title">KHIÊU CHIẾN KỲ THỦ AI</div>
+          <div class="hero-sub">Tỷ thí trí tuệ · Luyện công cờ tướng</div>
         </button>
       </div>
 
@@ -218,12 +259,10 @@
   </div>
 
   <!-- Cửa sổ Đăng nhập -->
-    <div id="loginGate" class="show">
+  <div id="loginGate" class="show">
     <div class="login-card">
-      <!-- 1. Tiêu đề đưa lên trên cùng -->
       <h1>Cờ Úp Tu Tiên</h1>
 
-      <!-- 2. Cụm quân cờ nằm ngay phía dưới tiêu đề -->
       <div class="login-mark chess-cluster">
         <div class="cluster-piece wood-red">帥</div>
         <div class="cluster-piece quartz-up"></div>
@@ -320,11 +359,11 @@
     </div>
   </div>
 
-  <!-- Âm thanh game (chỉ nạp metadata, không chặn băng thông lúc mở trang) -->
+  <!-- Âm thanh game -->
   <audio id="audGame" loop preload="metadata" src="/audio/spirit-song.mp3"></audio>
   <audio id="audHome" loop preload="metadata" src="/audio/lotus-dew.mp3"></audio>
 
-  <!-- Nạp scripts với defer để không block render giao diện -->
+  <!-- Scripts -->
   <script src="/js/game.js" defer></script>
   <script src="/js/net.js" defer></script>
 </body>

@@ -18,6 +18,18 @@ const TIME_MODES = [
   {id:15, label:"15 phút", gameMs:15*60*1000,  moveMs: 40*1000}
 ];
 
+// Hằng số bước đi tái sử dụng nhằm tránh cấp phát bộ nhớ liên tục trong Minimax
+const ADVISOR_STEPS = [[1,1],[1,-1],[-1,1],[-1,-1]];
+const ELEPHANT_STEPS = [[2,2],[2,-2],[-2,2],[-2,-2]];
+const KING_STEPS = [[1,0],[-1,0],[0,1],[0,-1]];
+const ORTHO_DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+const HORSE_HOPS = [
+  {bc:1, br:0, dc:2, dr:1}, {bc:1, br:0, dc:2, dr:-1},
+  {bc:-1, br:0, dc:-2, dr:1}, {bc:-1, br:0, dc:-2, dr:-1},
+  {bc:0, br:1, dc:1, dr:2}, {bc:0, br:1, dc:-1, dr:2},
+  {bc:0, br:-1, dc:1, dr:-2}, {bc:0, br:-1, dc:-1, dr:-2}
+];
+
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
 const statusEl = document.getElementById("status");
@@ -26,7 +38,21 @@ var myReady = false;
 var peerReady = false;
 const overlay = document.getElementById("overlay");
 
-let W, H, MARGIN, CELL;
+// Cache DOM đồng hồ để tránh reflow/tra cứu mỗi frame
+const domClock = {
+  tRed: document.getElementById("tRed"),
+  tBlack: document.getElementById("tBlack"),
+  clkRed: document.getElementById("clkRed"),
+  clkBlack: document.getElementById("clkBlack"),
+  wrapRed: document.getElementById("wrapRed"),
+  wrapBlack: document.getElementById("wrapBlack"),
+  ringRed: document.getElementById("ringRed"),
+  ringBlack: document.getElementById("ringBlack"),
+  mvRed: document.getElementById("mvRed"),
+  mvBlack: document.getElementById("mvBlack")
+};
+
+let W, H, MARGIN, CELL, pieceFont = "";
 function isMobileUI() {
   return window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
 }
@@ -47,6 +73,8 @@ function layout() {
   W = canvas.width; H = canvas.height;
   MARGIN = W * 0.065;
   CELL = (W - 2 * MARGIN) / 8;
+  const rad = CELL * 0.407;
+  pieceFont = "400 " + (rad * 1.28) + 'px "KaiTi","STKaiti","FangSong","Songti SC",serif';
 }
 layout();
 
@@ -65,6 +93,10 @@ var drawUsedPly = -1;
 var moveLock = false;
 var resignPending = false;
 var botTimer = null;
+
+function safeNetSend(msg) {
+  if (typeof netSend === "function") netSend(msg);
+}
 
 function cancelBotTimer() {
   if (botTimer) { clearTimeout(botTimer); botTimer = null; }
@@ -182,12 +214,15 @@ function applyScore(winner) {
 }
 
 function emptyBoard() {
-  return Array.from({length: ROWS}, () => Array(COLS).fill(null));
+  const b = new Array(ROWS);
+  for (let r = 0; r < ROWS; r++) b[r] = new Array(COLS).fill(null);
+  return b;
 }
-function clonePiece(p) { return p ? Object.assign({}, p) : null; }
+function clonePiece(p) {
+  return p ? { color: p.color, type: p.type, revealed: p.revealed, slot: p.slot } : null;
+}
 function cloneClocks(c) {
-  if (!c) return null;
-  return {red: c.red, black: c.black, moveLeft: c.moveLeft};
+  return c ? {red: c.red, black: c.black, moveLeft: c.moveLeft} : null;
 }
 function cloneState(s) {
   return {
@@ -274,7 +309,7 @@ function renderModes() {
       paintClocks();
       const wrap = document.getElementById("timeWrap");
       if (wrap) wrap.classList.add("open");
-      if (!isBotTable()) netSend({ type: "time", timeId: timeMode.id });
+      if (!isBotTable()) safeNetSend({ type: "time", timeId: timeMode.id });
     };
     box.appendChild(b);
   });
@@ -319,8 +354,8 @@ function resetBoard() {
   lastTick = performance.now();
   paintCaptures();
 }
-
 function showLobby() {
+  playDoor();
   started = false;
   moveLock = false;
   resignPending = false;
@@ -345,7 +380,7 @@ function showLobby() {
   draw();
   renderModes();
   applyViewLayout();
-  if (typeof netSend === "function") netSend({ type: "busy", on: false });
+  safeNetSend({ type: "busy", on: false });
   if (net.room && net.isHost && typeof relay === "function") relay({kind:"lobby"});
 }
 
@@ -379,8 +414,8 @@ function startMatch(fromNet) {
   draw();
   applyViewLayout();
   startTick();
-  hideHall();
-  netSend({ type: "busy", on: true });
+  if (typeof hideHall === "function") hideHall();
+  safeNetSend({ type: "busy", on: true });
   if (!fromNet && net.isHost) relay({kind:"sync", game: exportGame()});
   if (typeof updateReadyUI === "function") updateReadyUI();
   if (net.vsBot && state && !state.over && state.turn !== net.color) {
@@ -393,26 +428,25 @@ function walkAs(p) { return p.revealed ? p.type : p.slot; }
 function isTuongMode() {
   return typeof net !== "undefined" && net.variant === "tuong";
 }
+
 function movesAdvisorTuong(color, c, r, push) {
-  const steps = [[1,1],[1,-1],[-1,1],[-1,-1]];
-  for (let i = 0; i < steps.length; i++) {
-    const nc = c + steps[i][0], nr = r + steps[i][1];
-    if (!palace(color, nc, nr)) continue;
-    push(nc, nr);
+  for (let i = 0; i < 4; i++) {
+    const s = ADVISOR_STEPS[i];
+    const nc = c + s[0], nr = r + s[1];
+    if (palace(color, nc, nr)) push(nc, nr);
   }
 }
 function movesAdvisorUp(piece, color, c, r, push) {
-  const steps = [[1,1],[1,-1],[-1,1],[-1,-1]];
-  for (let i = 0; i < steps.length; i++) {
-    const nc = c + steps[i][0], nr = r + steps[i][1];
-    if (!piece.revealed && !palace(color, nc, nr)) continue;
-    push(nc, nr);
+  for (let i = 0; i < 4; i++) {
+    const s = ADVISOR_STEPS[i];
+    const nc = c + s[0], nr = r + s[1];
+    if (piece.revealed || palace(color, nc, nr)) push(nc, nr);
   }
 }
 function movesElephantTuong(board, color, c, r, push) {
-  const steps = [[2,2],[2,-2],[-2,2],[-2,-2]];
-  for (let i = 0; i < steps.length; i++) {
-    const dc = steps[i][0], dr = steps[i][1];
+  for (let i = 0; i < 4; i++) {
+    const s = ELEPHANT_STEPS[i];
+    const dc = s[0], dr = s[1];
     if (at(board, c + dc / 2, r + dr / 2)) continue;
     const nc = c + dc, nr = r + dr;
     if (!inBoard(nc, nr)) continue;
@@ -422,9 +456,9 @@ function movesElephantTuong(board, color, c, r, push) {
   }
 }
 function movesElephantUp(board, color, c, r, push) {
-  const steps = [[2,2],[2,-2],[-2,2],[-2,-2]];
-  for (let i = 0; i < steps.length; i++) {
-    const dc = steps[i][0], dr = steps[i][1];
+  for (let i = 0; i < 4; i++) {
+    const s = ELEPHANT_STEPS[i];
+    const dc = s[0], dr = s[1];
     if (at(board, c + dc / 2, r + dr / 2)) continue;
     push(c + dc, r + dr);
   }
@@ -436,16 +470,18 @@ function rawMoves(board, c, r) {
   const kind = walkAs(p);
   const color = p.color;
   const out = [];
+
   function push(nc, nr) {
     if (!inBoard(nc, nr)) return;
     const q = board[nr][nc];
     if (q && q.color === color) return;
     out.push({c: nc, r: nr, capture: !!q});
   }
+
   if (kind === "K") {
-    const steps = [[1,0],[-1,0],[0,1],[0,-1]];
-    for (let i = 0; i < steps.length; i++) {
-      const nc = c + steps[i][0], nr = r + steps[i][1];
+    for (let i = 0; i < 4; i++) {
+      const s = KING_STEPS[i];
+      const nc = c + s[0], nr = r + s[1];
       if (palace(color, nc, nr)) push(nc, nr);
     }
     const dir = color === "red" ? 1 : -1;
@@ -469,23 +505,17 @@ function rawMoves(board, c, r) {
     return out;
   }
   if (kind === "H") {
-    const hops = [
-      {bc:1, br:0, dc:2, dr:1}, {bc:1, br:0, dc:2, dr:-1},
-      {bc:-1, br:0, dc:-2, dr:1}, {bc:-1, br:0, dc:-2, dr:-1},
-      {bc:0, br:1, dc:1, dr:2}, {bc:0, br:1, dc:-1, dr:2},
-      {bc:0, br:-1, dc:1, dr:-2}, {bc:0, br:-1, dc:-1, dr:-2}
-    ];
-    for (let i = 0; i < hops.length; i++) {
-      const h = hops[i];
+    for (let i = 0; i < 8; i++) {
+      const h = HORSE_HOPS[i];
       if (at(board, c + h.bc, r + h.br)) continue;
       push(c + h.dc, r + h.dr);
     }
     return out;
   }
   if (kind === "R" || kind === "C") {
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
     for (let d = 0; d < 4; d++) {
-      const dc = dirs[d][0], dr = dirs[d][1];
+      const s = ORTHO_DIRS[d];
+      const dc = s[0], dr = s[1];
       let nc = c + dc, nr = r + dr, jumped = 0;
       while (inBoard(nc, nr)) {
         const q = board[nr][nc];
@@ -513,12 +543,17 @@ function rawMoves(board, c, r) {
   return out;
 }
 
+// Tướng chỉ có thể nằm trong cung cấm (c: 3..5, r: 0..2 hoặc 7..9) -> Giảm phạm vi quét từ 90 ô còn 9 ô
 function findKing(board, color) {
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
+  const minR = color === "red" ? 0 : 7;
+  const maxR = color === "red" ? 2 : 9;
+  for (let r = minR; r <= maxR; r++) {
+    const row = board[r];
+    for (let c = 3; c <= 5; c++) {
+      const p = row[c];
       if (p && p.type === "K" && p.color === color) return {c, r};
     }
+  }
   return null;
 }
 function generalsFace(board) {
@@ -528,25 +563,34 @@ function generalsFace(board) {
   for (let r = lo + 1; r < hi; r++) if (board[r][rk.c]) return false;
   return true;
 }
+
+// Tối ưu hóa cực đại: Chỉ slice từng hàng và clone đúng quân cờ di chuyển thay vì clone toàn bộ 90 ô
 function applyMoveBoard(board, mv) {
-  const nb = board.map(row => row.map(clonePiece));
+  const nb = new Array(ROWS);
+  for (let r = 0; r < ROWS; r++) nb[r] = board[r].slice();
   const p = nb[mv.fromR][mv.fromC];
   nb[mv.fromR][mv.fromC] = null;
-  const np = Object.assign({}, p);
-  np.revealed = true;
-  if (mv.revealedType) np.type = mv.revealedType;
-  nb[mv.toR][mv.toC] = np;
+  nb[mv.toR][mv.toC] = {
+    color: p.color,
+    type: mv.revealedType || p.type,
+    revealed: true,
+    slot: p.slot
+  };
   return nb;
 }
+
 function attacksKing(board, attackerColor, kingPos) {
-  for (let r = 0; r < ROWS; r++)
+  for (let r = 0; r < ROWS; r++) {
+    const row = board[r];
     for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
+      const p = row[c];
       if (!p || p.color !== attackerColor) continue;
       const ms = rawMoves(board, c, r);
-      for (let i = 0; i < ms.length; i++)
+      for (let i = 0; i < ms.length; i++) {
         if (ms[i].c === kingPos.c && ms[i].r === kingPos.r) return true;
+      }
     }
+  }
   return false;
 }
 function inCheck(board, color) {
@@ -556,20 +600,24 @@ function inCheck(board, color) {
 }
 function boardKey(board, turn) {
   let s = turn + "|";
-  for (let r = 0; r < ROWS; r++)
+  for (let r = 0; r < ROWS; r++) {
+    const row = board[r];
     for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
+      const p = row[c];
       if (!p) continue;
       s += c + "," + r + p.color + p.type + (p.revealed ? "1" : "0") + p.slot + ";";
     }
+  }
   return s;
 }
 function allRevealed(board) {
-  for (let r = 0; r < ROWS; r++)
+  for (let r = 0; r < ROWS; r++) {
+    const row = board[r];
     for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
+      const p = row[c];
       if (p && !p.revealed) return false;
     }
+  }
   return true;
 }
 function sideCanCheck(board, color) {
@@ -578,19 +626,27 @@ function sideCanCheck(board, color) {
   return attacksKing(board, color, k);
 }
 function cycleTriple(keys) {
+  const len = keys.length;
   for (let p = 2; p <= 8; p += 2) {
-    if (keys.length < p * 3) continue;
-    const sl = keys.slice(-p * 3);
-    const a = sl.slice(0, p).join("#");
-    const b = sl.slice(p, p * 2).join("#");
-    const c = sl.slice(p * 2).join("#");
-    if (a && a === b && b === c) return true;
+    const p3 = p * 3;
+    if (len < p3) continue;
+    const start = len - p3;
+    let matched = true;
+    for (let i = 0; i < p; i++) {
+      const k = keys[start + i];
+      if (k !== keys[start + p + i] || k !== keys[start + 2 * p + i]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return true;
   }
   return false;
 }
 function consecFlag(trace, color, flag) {
+  if (!trace) return 0;
   let n = 0;
-  for (let i = (trace || []).length - 1; i >= 0; i--) {
+  for (let i = trace.length - 1; i >= 0; i--) {
     const t = trace[i];
     if (t.color !== color) continue;
     if (!t[flag]) break;
@@ -599,9 +655,13 @@ function consecFlag(trace, color, flag) {
   return n;
 }
 function isChaseMove(board, fromC, fromR, toC, toR, color, trace) {
-  const last = (trace || []).filter(t => t.color !== color).pop();
+  if (!trace || !trace.length) return false;
+  let last = null;
+  for (let i = trace.length - 1; i >= 0; i--) {
+    if (trace[i].color !== color) { last = trace[i]; break; }
+  }
   if (!last) return false;
-  const nb = applyMoveBoard(board, {fromC: fromC, fromR: fromR, toC: toC, toR: toR});
+  const nb = applyMoveBoard(board, {fromC, fromR, toC, toR});
   const hits = rawMoves(nb, toC, toR);
   for (let i = 0; i < hits.length; i++) {
     if (hits[i].c === last.toC && hits[i].r === last.toR && hits[i].capture) return true;
@@ -631,14 +691,18 @@ function legalMoves(board, c, r) {
 }
 function allLegal(board, color) {
   const list = [];
-  for (let r = 0; r < ROWS; r++)
+  for (let r = 0; r < ROWS; r++) {
+    const row = board[r];
     for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
+      const p = row[c];
       if (!p || p.color !== color) continue;
       const ms = legalMoves(board, c, r);
-      for (let i = 0; i < ms.length; i++)
-        list.push({fromC:c, fromR:r, toC:ms[i].c, toR:ms[i].r, capture:ms[i].capture});
+      for (let i = 0; i < ms.length; i++) {
+        const m = ms[i];
+        list.push({fromC:c, fromR:r, toC:m.c, toR:m.r, capture:m.capture});
+      }
     }
+  }
   return list;
 }
 function sqName(c, r) { return String.fromCharCode(97 + c) + (r + 1); }
@@ -652,22 +716,26 @@ function addLog(t) {
   logEl.prepend(d);
 }
 
+let lastTRed = "", lastTBlack = "";
 function paintClocks() {
   if (!clocks) return;
-  document.getElementById("tRed").textContent = fmtMs(clocks.red);
-  document.getElementById("tBlack").textContent = fmtMs(clocks.black);
+  const sRed = fmtMs(clocks.red);
+  const sBlack = fmtMs(clocks.black);
+  if (sRed !== lastTRed) { domClock.tRed.textContent = sRed; lastTRed = sRed; }
+  if (sBlack !== lastTBlack) { domClock.tBlack.textContent = sBlack; lastTBlack = sBlack; }
+
   const redTurn = started && state && !state.over && state.turn === "red";
   const blackTurn = started && state && !state.over && state.turn === "black";
-  const cr = document.getElementById("clkRed");
-  const cb = document.getElementById("clkBlack");
-  cr.className = "clock" + (redTurn ? " active" : "") + ((redTurn && clocks.moveLeft < 5000) || clocks.red < 15000 ? " low" : "");
-  cb.className = "clock" + (blackTurn ? " active" : "") + ((blackTurn && clocks.moveLeft < 5000) || clocks.black < 15000 ? " low" : "");
+  
+  domClock.clkRed.className = "clock" + (redTurn ? " active" : "") + ((redTurn && clocks.moveLeft < 5000) || clocks.red < 15000 ? " low" : "");
+  domClock.clkBlack.className = "clock" + (blackTurn ? " active" : "") + ((blackTurn && clocks.moveLeft < 5000) || clocks.black < 15000 ? " low" : "");
+
   const C = 2 * Math.PI * 32;
   const max = timeMode.moveMs || 1;
   function ring(side, on) {
-    const wrap = document.getElementById(side === "red" ? "wrapRed" : "wrapBlack");
-    const circ = document.getElementById(side === "red" ? "ringRed" : "ringBlack");
-    const num = document.getElementById(side === "red" ? "mvRed" : "mvBlack");
+    const wrap = side === "red" ? domClock.wrapRed : domClock.wrapBlack;
+    const circ = side === "red" ? domClock.ringRed : domClock.ringBlack;
+    const num = side === "red" ? domClock.mvRed : domClock.mvBlack;
     const left = on ? Math.max(0, clocks.moveLeft) : max;
     const ratio = Math.max(0, Math.min(1, left / max));
     circ.style.strokeDasharray = String(C);
@@ -757,7 +825,7 @@ function finish(winner, reason, fromNet) {
     if (typeof updateReadyUI === "function") updateReadyUI();
   }, 2500);
   playEndMusic(winner, reason);
-  netSend({ type: "busy", on: false });
+  safeNetSend({ type: "busy", on: false });
   if (typeof updateReadyUI === "function") updateReadyUI();
   if (net.online && !fromNet) relay({kind:"finish", winner: winner, reason: reason});
 }
@@ -834,9 +902,11 @@ function applyMove(mv, fromNet, extra) {
 }
 
 const BOT_LEVELS = {
-  normal: { label: "Trúc Cơ", depth: 6,  timeMs: 1200, mistakeChance: 0.05, samples: 2 },
-  hard:   { label: "Kim Đan", depth: 8,  timeMs: 2200, mistakeChance: 0, samples: 2 },
-  master: { label: "Hóa Thần", depth: 12, timeMs: 4000, mistakeChance: 0, samples: 2 }
+  normal:      { label: "Trúc Cơ",    depth: 6,  timeMs: 1200,  mistakeChance: 0.03, samples: 2 },
+  hard:        { label: "Kim Đan",    depth: 8,  timeMs: 2200,  mistakeChance: 0,    samples: 2 },
+  master:      { label: "Hóa Thần",   depth: 12, timeMs: 4000,  mistakeChance: 0,    samples: 2 },
+  tribulation: { label: "Độ Kiếp",    depth: 16, timeMs: 10000, mistakeChance: 0,    samples: 6 },
+  immortal:    { label: "Chân Tiên",  depth: 20, timeMs: 20000, mistakeChance: 0,    samples: 10 }
 };
 const BOT_ADAPT_KEY = "coupBotAdapt";
 const BOT_BREAKTHROUGH_STREAK = 3;
@@ -886,108 +956,131 @@ function botAdaptLevel(baseLevel, levelKey) {
   const mistakeChance = Math.max(0, Math.min(0.35, (baseLevel.mistakeChance || 0) - tier * 0.02 - adj * 0.02));
   return Object.assign({}, baseLevel, {depth: depth, timeMs: timeMs, mistakeChance: mistakeChance});
 }
-const BOT_PIECE_VAL = {K:10000, R:900, C:450, H:400, E:200, A:200, P:100};
-const BOT_BAG_COUNTS = {A:2, E:2, H:2, R:2, C:2, P:5};
+const BOT_PIECE_VAL = {K:10000, R:950, C:480, H:420, E:210, A:210, P:110};
 
 function botRemainingPool(board, capturedOfColor, color) {
-  const pool = Object.assign({}, BOT_BAG_COUNTS);
-  function consume(type) { if (pool[type] > 0) pool[type]--; }
-  for (let r = 0; r < ROWS; r++)
+  const pool = {A:2, E:2, H:2, R:2, C:2, P:5};
+  for (let r = 0; r < ROWS; r++) {
+    const row = board[r];
     for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
-      if (p && p.color === color && p.revealed && p.type !== "K") consume(p.type);
+      const p = row[c];
+      if (p && p.color === color && p.revealed && p.type !== "K") {
+        if (pool[p.type] > 0) pool[p.type]--;
+      }
     }
-  (capturedOfColor || []).forEach(function (p) {
-    if (p.revealed && p.type !== "K") consume(p.type);
-  });
+  }
+  if (capturedOfColor) {
+    for (let i = 0; i < capturedOfColor.length; i++) {
+      const p = capturedOfColor[i];
+      if (p.revealed && p.type !== "K" && pool[p.type] > 0) pool[p.type]--;
+    }
+  }
   return pool;
 }
-function botPoolToArray(pool) {
+function botShuffledPoolArray(pool) {
   const arr = [];
-  Object.keys(pool).forEach(function (t) {
-    for (let i = 0; i < pool[t]; i++) arr.push(t);
-  });
+  const keys = ["A", "E", "H", "R", "C", "P"];
+  for (let k = 0; k < 6; k++) {
+    const t = keys[k];
+    const cnt = pool[t];
+    for (let i = 0; i < cnt; i++) arr.push(t);
+  }
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
   return arr;
 }
-function botShuffleArr(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const t = a[i]; a[i] = a[j]; a[j] = t;
-  }
-  return a;
-}
 function botDeterminize(board, captured) {
-  const nb = board.map(function (row) { return row.map(clonePiece); });
-  ["red", "black"].forEach(function (color) {
+  const nb = board.map(row => row.map(clonePiece));
+  const colors = ["red", "black"];
+  for (let ci = 0; ci < 2; ci++) {
+    const color = colors[ci];
     const opp = color === "red" ? "black" : "red";
     const capturedOfColor = (captured && captured[opp]) || [];
-    const pool = botShuffleArr(botPoolToArray(botRemainingPool(board, capturedOfColor, color)));
+    const pool = botShuffledPoolArray(botRemainingPool(board, capturedOfColor, color));
     let idx = 0;
-    for (let r = 0; r < ROWS; r++)
+    for (let r = 0; r < ROWS; r++) {
+      const row = nb[r];
       for (let c = 0; c < COLS; c++) {
-        const p = nb[r][c];
+        const p = row[c];
         if (p && p.color === color && !p.revealed) {
           p.type = idx < pool.length ? pool[idx] : p.slot;
           idx++;
         }
       }
-  });
-  return nb;
-}
-function botPseudoMobility(board, color) {
-  let n = 0;
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
-      if (p && p.color === color) n += rawMoves(board, c, r).length;
     }
-  return n;
+  }
+  return nb;
 }
 function botRookOpenFileBonus(board, c) {
   let blockers = 0;
   for (let r = 0; r < ROWS; r++) if (board[r][c]) blockers++;
-  return Math.max(0, 6 - blockers) * 4;
+  return Math.max(0, 6 - blockers) * 5;
 }
-function botGuardCounts(board, color) {
-  let advisors = 0, elephants = 0;
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
-      if (!p || p.color !== color) continue;
-      if (p.type === "A") advisors++;
-      else if (p.type === "E") elephants++;
-    }
-  return {advisors: advisors, elephants: elephants};
-}
+
+// Tối ưu gộp 1 lượt duyệt duy nhất cho piece val, guard counts và mobility
 function botEvaluate(board, color) {
   const opp = color === "red" ? "black" : "red";
   let score = 0;
-  for (let r = 0; r < ROWS; r++)
+  let myAdvisors = 0, oppAdvisors = 0;
+  let myElephants = 0, oppElephants = 0;
+  let myMobility = 0, oppMobility = 0;
+
+  for (let r = 0; r < ROWS; r++) {
+    const row = board[r];
     for (let c = 0; c < COLS; c++) {
-      const p = board[r][c];
+      const p = row[c];
       if (!p) continue;
+
       let v = BOT_PIECE_VAL[p.type] || 0;
-      if (p.type === "P" && crossedRiver(p.color, r)) v += 90;
-      if (p.type === "H" || p.type === "C") v += (4 - Math.abs(c - 4)) * 3;
-      if (p.type === "R") v += (4 - Math.abs(c - 4)) * 2 + botRookOpenFileBonus(board, c);
-      if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) v += 12;
-      score += (p.color === color) ? v : -v;
+      if (p.type === "P" && crossedRiver(p.color, r)) {
+        v += 110;
+        if (c >= 2 && c <= 6) v += 25;
+      } else if (p.type === "H" || p.type === "C") {
+        v += (4 - Math.abs(c - 4)) * 5;
+      } else if (p.type === "R") {
+        v += (4 - Math.abs(c - 4)) * 3 + botRookOpenFileBonus(board, c);
+      }
+      if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) {
+        v += 15;
+      }
+
+      if (p.color === color) {
+        score += v;
+        if (p.type === "A") myAdvisors++;
+        else if (p.type === "E") myElephants++;
+        myMobility += rawMoves(board, c, r).length;
+      } else {
+        score -= v;
+        if (p.type === "A") oppAdvisors++;
+        else if (p.type === "E") oppElephants++;
+        oppMobility += rawMoves(board, c, r).length;
+      }
     }
-  score += (botPseudoMobility(board, color) - botPseudoMobility(board, opp)) * 2;
-  const mine = botGuardCounts(board, color), theirs = botGuardCounts(board, opp);
-  score += (mine.advisors - theirs.advisors) * 18 + (mine.elephants - theirs.elephants) * 16;
-  if (mine.advisors === 2) score += 10;
-  if (mine.elephants === 2) score += 10;
+  }
+
+  score += (myMobility - oppMobility) * 3;
+  score += (myAdvisors - oppAdvisors) * 20 + (myElephants - oppElephants) * 18;
+  if (myAdvisors === 2) score += 12;
+  if (myElephants === 2) score += 12;
   return score;
 }
+
 function botMoveKey(m) { return m.fromC + "," + m.fromR + ">" + m.toC + "," + m.toR; }
+
+// Tính trước điểm move score (Schwartzian transform) để sort không gọi botMoveScore N*logN lần
 function botOrderMoves(board, moves, ttMove, depth) {
   const ttKey = ttMove ? botMoveKey(ttMove) : null;
   const killers = (botKillers && botKillers[depth]) || null;
-  return moves.slice().sort(function (a, b) {
-    return botMoveScore(board, b, ttKey, killers) - botMoveScore(board, a, ttKey, killers);
-  });
+  const scored = new Array(moves.length);
+  for (let i = 0; i < moves.length; i++) {
+    scored[i] = { move: moves[i], score: botMoveScore(board, moves[i], ttKey, killers) };
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const out = new Array(moves.length);
+  for (let i = 0; i < moves.length; i++) out[i] = scored[i].move;
+  return out;
 }
 function botMoveScore(board, m, ttKey, killers) {
   const key = botMoveKey(m);
@@ -1017,7 +1110,7 @@ function botQuiesce(board, alpha, beta, color) {
   if (standPat >= beta) return beta;
   if (standPat > alpha) alpha = standPat;
   const opp = color === "red" ? "black" : "red";
-  const moves = allLegal(board, color).filter(function (m) { return !!board[m.toR][m.toC]; });
+  const moves = allLegal(board, color).filter(m => !!board[m.toR][m.toC]);
   const ordered = botOrderMoves(board, moves, null, -1);
   for (let i = 0; i < ordered.length; i++) {
     const nb = applyMoveBoard(board, ordered[i]);
@@ -1033,7 +1126,9 @@ function botNegamax(board, depth, alpha, beta, color, ply) {
   const opp = color === "red" ? "black" : "red";
   if (!findKing(board, color)) return -9000 + ply;
   if (!findKing(board, opp)) return 9000 - ply;
-  const key = boardKey(board, color) + "#" + depth;
+  
+  // Tối ưu TT: Bỏ "#depth" khỏi key để tái sử dụng ttMove và cutoff từ độ sâu thấp hơn
+  const key = boardKey(board, color);
   const tt = botTT.get(key);
   let ttMove = null;
   const origAlpha = alpha;
@@ -1109,20 +1204,23 @@ function botChooseMove(board, color, captured, level) {
     const result = botSearchOnBoard(sampledBoard, color, level.depth, perSampleMs, rootMoves);
     if (!result.move) continue;
     const key = botMoveKey(result.move);
-    const cur = tally.get(key) || {move: result.move, total: 0, count: 0};
+    const cur = tally.get(key) || {move: result.move, total: 0, count: 0, avgScore: 0};
     cur.total += result.score;
     cur.count++;
+    cur.avgScore = cur.total / cur.count;
     tally.set(key, cur);
   }
-  let best = null;
-  tally.forEach(function (v) {
-    if (!best || v.count > best.count || (v.count === best.count && v.total / v.count > best.total / best.count)) best = v;
-  });
-  if (!best) return rootMoves[Math.floor(Math.random() * rootMoves.length)];
+  const candidates = [];
+  tally.forEach(v => candidates.push(v));
+  if (!candidates.length) return rootMoves[Math.floor(Math.random() * rootMoves.length)];
+  candidates.sort((a, b) => (b.count !== a.count) ? b.count - a.count : b.avgScore - a.avgScore);
   if (level.mistakeChance && Math.random() < level.mistakeChance) {
     return rootMoves[Math.floor(Math.random() * rootMoves.length)];
   }
-  return best.move;
+  const topScore = candidates[0].avgScore;
+  const topMoves = candidates.filter(c => Math.abs(c.avgScore - topScore) <= 40);
+  const chosen = topMoves[Math.floor(Math.random() * topMoves.length)];
+  return chosen ? chosen.move : candidates[0].move;
 }
 function botPlay() {
   botTimer = null;
@@ -1321,14 +1419,10 @@ function pauseTrack(id) {
   if (!el) return;
   try { el.pause(); } catch (e) {}
 }
-function stopMusic() {
-  pauseTrack("audGame");
-}
+function stopMusic() { pauseTrack("audGame"); }
 let homeMusicOn = true;
 let homeVol = 0.35;
-function stopHomeMusic() {
-  pauseTrack("audHome");
-}
+function stopHomeMusic() { pauseTrack("audHome"); }
 function stopTracks() {
   ["audGame", "audHome"].forEach(function (id) {
     const el = document.getElementById(id);
@@ -1412,14 +1506,10 @@ function viewC(c) { return boardFlipped() ? 8 - c : c; }
 function viewR(r) { return boardFlipped() ? 9 - r : r; }
 
 function applyViewLayout() {
-  let shouldFlip = false;
-  if (isMobileUI()) {
-    // Cấu hình riêng cho Mobile: nếu trên điện thoại bị ngược ghế, đổi "red" thành "black"
-    shouldFlip = !!(net && net.color === "red");
-  } else {
-    // Cấu hình riêng cho Máy tính (Desktop): nếu trên máy tính bị ngược ghế, đổi "black" thành "red"
-    shouldFlip = !!(net && net.color === "red");
-  }
+  // Khi bạn cầm Đỏ: lật ghế (Đỏ xuống dưới, Đen lên trên) khớp với bàn cờ ở dưới.
+  // Khi bạn cầm Đen: giữ nguyên mặc định (Đen đã ở sẵn phía dưới).
+  const shouldFlip = !!(net && net.color === "red");
+
   const sc = document.querySelector(".side-clocks");
   if (sc) sc.classList.toggle("flip", shouldFlip);
   const lc = document.querySelector(".left-col");
@@ -1506,6 +1596,7 @@ function drawBoard() {
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("SÔNG", x0 + 4 * CELL, y0 + 4.5 * CELL);
 }
+
 function drawPiece(p, c, r, checkedKing) {
   const x = MARGIN + viewC(c) * CELL, y = MARGIN + viewR(r) * CELL, rad = CELL * 0.407;
   const isCheckKing = checkedKing && p.type === "K" && p.color === checkedKing;
@@ -1535,7 +1626,7 @@ function drawPiece(p, c, r, checkedKing) {
     ctx.fill();
   }
   if (p.revealed) {
-    ctx.font = "400 " + (rad * 1.28) + 'px "KaiTi","STKaiti","FangSong","Songti SC",serif';
+    ctx.font = pieceFont;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const ch = GLYPH[p.color][p.type];
@@ -1561,9 +1652,12 @@ function draw() {
     if (h.capture) { ctx.strokeStyle = "#c62828"; ctx.lineWidth = 2; ctx.stroke(); }
   }
   const checkedKing = (started && !state.over && inCheck(state.board, state.turn)) ? state.turn : null;
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++)
-      if (state.board[r][c]) drawPiece(state.board[r][c], c, r, checkedKing);
+  for (let r = 0; r < ROWS; r++) {
+    const row = state.board[r];
+    for (let c = 0; c < COLS; c++) {
+      if (row[c]) drawPiece(row[c], c, r, checkedKing);
+    }
+  }
 }
 
 function paintCaptures() {
@@ -1669,7 +1763,7 @@ function sendChat(txt) {
     relay({kind:"chat", text: txt});
     return;
   }
-  const who = ownName ? ownName() : (state && state.turn === "red" ? "Đỏ" : "Đen");
+  const who = typeof ownName === "function" ? ownName() : (state && state.turn === "red" ? "Đỏ" : "Đen");
   showChat(who, txt);
 }
 (function buildQuickChat() {
@@ -1790,7 +1884,7 @@ document.getElementById("btnResignYes").onclick = function () {
     resignPending = true;
     document.getElementById("btnResign").disabled = true;
     document.getElementById("netHint").textContent = "Đang gửi yêu cầu xin thua...";
-    netSend({type:"resign"});
+    safeNetSend({type:"resign"});
     return;
   }
   finish(loser === "red" ? "black" : "red", (loser === "red" ? "Đỏ" : "Đen") + " xin thua");
@@ -1807,7 +1901,7 @@ function updateReadyUI() {
       gate.classList.remove("show");
       hideStartButton();
       renderModes();
-      if (botBox) botBox.classList.remove("show");
+      if (botBox) botBox.style.display = "none";
       return;
     }
     gate.classList.add("show");
@@ -1815,12 +1909,12 @@ function updateReadyUI() {
     btn.style.display = "none";
     start.style.display = "inline-block";
     start.textContent = "Bắt đầu";
-    if (botBox) botBox.classList.add("show");
+    if (botBox) botBox.style.display = "flex";
     renderBotLevels();
     renderModes();
     return;
   }
-  if (botBox) botBox.classList.remove("show");
+  if (botBox) botBox.style.display = "none";
   if (net.spectate) {
     gate.classList.add("show");
     hint.textContent = "Bạn đang xem bàn " + (net.room || "") + ". Chỉ chat, không đi cờ.";
@@ -1857,8 +1951,8 @@ document.getElementById("btnReady").onclick = function () {
   if (started && state && !state.over) return;
   if (!net.color) { addLog("Chờ đối thủ vào bàn."); return; }
   myReady = !myReady;
-  if (myReady && net.isHost) netSend({ type: "time", timeId: timeMode.id });
-  netSend({ type: "ready", on: myReady });
+  if (myReady && net.isHost) safeNetSend({ type: "time", timeId: timeMode.id });
+  safeNetSend({ type: "ready", on: myReady });
   updateReadyUI();
 };
 function renderBotLevels() {
@@ -1870,13 +1964,17 @@ function renderBotLevels() {
     b.disabled = locked;
   });
 }
-Array.prototype.forEach.call(document.querySelectorAll("#botLevels button"), function (b) {
-  b.onclick = function () {
-    if (gameInPlay()) return;
+
+const botLevelsContainer = document.getElementById("botLevels");
+if (botLevelsContainer) {
+  botLevelsContainer.onclick = function (ev) {
+    const b = ev.target.closest("button");
+    if (!b || gameInPlay()) return;
     net.botLevel = b.dataset.level;
     renderBotLevels();
   };
-});
+}
+
 document.getElementById("btnStart").onclick = function () {
   hideStartButton();
   if (isBotTable()) {
@@ -1887,7 +1985,7 @@ document.getElementById("btnStart").onclick = function () {
     if (typeof updateReadyUI === "function") updateReadyUI();
     return;
   }
-  netSend({ type: "begin" });
+  safeNetSend({ type: "begin" });
 };
 document.getElementById("btnTime").onclick = function (ev) {
   ev.preventDefault();
@@ -1985,6 +2083,8 @@ function saveOwnAvatar(src) {
 function setAvatar(color, src) {
   const btn = document.getElementById(color === "red" ? "avRed" : "avBlack");
   if (!btn) return;
+  if (btn.dataset.src === (src || "")) return;
+  btn.dataset.src = src || "";
   btn.replaceChildren();
   if (src) {
     const img = document.createElement("img");

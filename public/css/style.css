@@ -361,7 +361,7 @@ body:has(#loginGate.show) #gameWrap {
   font-family: "Palatino Linotype", Palatino, "Times New Roman", serif;
 }
 
-/* Tùy biến nút Chơi Với Máy (Bot AI Cờ Tướng) */
+/* Nút Chơi Với Máy (Bot AI) */
 #btnVsBot.btn-vs-bot {
   width: min(380px, 92vw);
   margin: 14px auto 0;
@@ -389,7 +389,6 @@ body:has(#loginGate.show) #gameWrap {
   box-shadow: 0 2px 0 #180d05, 0 4px 8px rgba(0, 0, 0, 0.4);
 }
 
-/* Khu vực minh họa Robot và quân cờ */
 .bot-hero-art {
   display: flex;
   align-items: center;
@@ -399,7 +398,6 @@ body:has(#loginGate.show) #gameWrap {
   position: relative;
 }
 
-/* Quân cờ tướng hai bên */
 .disc-deco {
   width: 44px;
   height: 44px;
@@ -425,7 +423,6 @@ body:has(#loginGate.show) #gameWrap {
   transform: rotate(10deg);
 }
 
-/* Khối Robot */
 .bot-thinking {
   position: relative;
   width: 60px;
@@ -441,7 +438,6 @@ body:has(#loginGate.show) #gameWrap {
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
 }
 
-/* Mắt robot nhấp nháy */
 .bot-eye {
   animation: eyeBlink 2.4s ease-in-out infinite;
 }
@@ -461,7 +457,6 @@ body:has(#loginGate.show) #gameWrap {
   }
 }
 
-/* Bánh răng suy ngẫm */
 .gear-cog {
   position: absolute;
   top: -4px;
@@ -481,7 +476,6 @@ body:has(#loginGate.show) #gameWrap {
   }
 }
 
-/* Tia sáng ý tưởng */
 .thought-sparkle {
   position: absolute;
   top: -12px;
@@ -503,7 +497,6 @@ body:has(#loginGate.show) #gameWrap {
   }
 }
 
-/* Chữ hiển thị */
 .hero-title {
   font-size: 1.15rem;
   font-weight: 800;
@@ -818,7 +811,7 @@ body:has(#loginGate.show) #gameWrap {
   display: flex;
 }
 
-/* Lớp phủ toàn màn hình cổng đăng nhập */
+/* Lớp phủ cổng đăng nhập */
 #loginGate {
   display: none;
   position: fixed;
@@ -828,7 +821,6 @@ body:has(#loginGate.show) #gameWrap {
   align-items: center;
   justify-content: center;
 }
-
 #loginGate.show {
   display: flex !important;
 }
@@ -849,7 +841,7 @@ body:has(#loginGate.show) #gameWrap {
   max-width: 90%;
 }
 
-/* Cụm quân cờ gỗ & ngọc thạch anh 3D */
+/* Cụm quân cờ 3D */
 .chess-cluster {
   position: relative;
   width: 250px;
@@ -871,7 +863,6 @@ body:has(#loginGate.show) #gameWrap {
   transition: transform 0.2s ease;
 }
 
-/* Quân gỗ đỏ nghiêng trái */
 .cluster-piece.wood-red {
   left: 6px;
   top: 14px;
@@ -883,7 +874,6 @@ body:has(#loginGate.show) #gameWrap {
   z-index: 1;
 }
 
-/* Quân cờ Úp Thạch Anh */
 .cluster-piece.quartz-up {
   left: 46px;
   top: 4px;
@@ -896,7 +886,6 @@ body:has(#loginGate.show) #gameWrap {
   z-index: 3;
 }
 
-/* Quân gỗ vàng kim nghiêng phải */
 .cluster-piece.wood-black {
   right: 6px;
   top: 14px;
@@ -908,7 +897,6 @@ body:has(#loginGate.show) #gameWrap {
   z-index: 2;
 }
 
-/* Tiêu đề 3D */
 .login-card h1 {
   transform: translateY(-35px);
   display: inline-block;
@@ -926,7 +914,6 @@ body:has(#loginGate.show) #gameWrap {
     0 0 3px rgb(158, 159, 160);
 }
 
-/* Nền tảng nút khối Ngọc Thạch 3D */
 .login-card button {
   position: relative;
   overflow: hidden;
@@ -985,7 +972,6 @@ body:has(#loginGate.show) #gameWrap {
   filter: brightness(0.95);
 }
 
-/* 1. Hổ Phách / Huyền Ngọc (Nút Khách) */
 .login-guest {
   background: linear-gradient(180deg, #271c18 0%, #521807 60%, #46140b 100%);
   box-shadow: 0 5px 0 #55382c, 0 8px 12px rgba(85, 3, 3, 0.26);
@@ -997,7 +983,6 @@ body:has(#loginGate.show) #gameWrap {
   box-shadow: 0 2px 0 #610345, 0 3px 6px rgba(99, 4, 48, 0.4);
 }
 
-/* 2. Chu Sa / Huyết Ngọc (Nút Google) */
 .login-google {
   background: linear-gradient(180deg, hsla(0, 97%, 25%, 0.648) 0%, #950606 60%, #6d0606 100%);
   box-shadow: 0 5px 0 #02371b, 0 8px 15px rgba(6, 39, 21, 0.45);
@@ -1009,7 +994,6 @@ body:has(#loginGate.show) #gameWrap {
   box-shadow: 0 2px 0 #520606, 0 3px 6px rgba(57, 3, 57, 0.4);
 }
 
-/* 3. Lục Ngọc / Bích Tinh (Nút Facebook) */
 .login-fb {
   background: linear-gradient(180deg, #05621c 0%, #0a722b 60%, #0a4c18 100%);
   box-shadow: 0 5px 0 #06640b, 0 8px 15px rgba(7, 157, 12, 0.45);
@@ -1088,7 +1072,7 @@ body:has(#loginGate.show) #gameWrap {
   margin-top: 6px;
 }
 
-/* Vòng tròn Avatar & Đồng hồ đếm bước */
+/* Vòng tròn Avatar & Đồng hồ */
 .player {
   display: flex;
   flex-direction: column;
@@ -1775,7 +1759,7 @@ canvas {
   object-fit: cover;
 }
 
-/* Lớp phủ ván đấu kết thúc */
+/* Lớp phủ kết thúc ván đấu */
 #overlay {
   position: fixed;
   inset: 0;
@@ -2074,7 +2058,19 @@ canvas {
     line-height: 24px;
   }
 
-  /* Người chơi trên mobile */
+  /* Đảo bên khay quân ăn khi lật bàn cờ */
+  .left-col.flip #capRed {
+    top: auto;
+    bottom: 52px;
+    left: auto;
+    right: 4px;
+  }
+  .left-col.flip #capBlack {
+    bottom: auto;
+    top: 52px;
+    right: auto;
+    left: 4px;
+  }
   .side-clocks .player,
   .side-clocks.flip .player {
     display: flex;
@@ -2111,14 +2107,14 @@ canvas {
   .side-clocks .player .rank-box {
     width: 70px;
   }
- .side-clocks > .player:first-of-type {
+  .side-clocks > .player:first-of-type {
     grid-column: 4; 
     grid-row: 2; 
     justify-self: end; 
     align-self: end;
   }
   .side-clocks > .player:last-of-type {
-    grid-column: 1; 
+    grid-column: 1;
     grid-row: 4; 
     justify-self: start; 
     align-self: start;
@@ -2135,7 +2131,7 @@ canvas {
     justify-self: end; 
     align-self: end;
   }
-  /* Công cụ & Home Mobile */
+
   .board-tools {
     grid-row: 1;
     grid-column: 3 / 5;
@@ -2203,7 +2199,6 @@ canvas {
     top: 44px;
   }
 
-  /* Khung Chat */
   #chatLog {
     order: 4;
     position: fixed;

@@ -80,6 +80,8 @@ layout();
 
 let state, selected, hints, history = [];
 let lastMove = null, lastMoveTime = 0;
+let moveAnim = null;
+const MOVE_SPEED_MS = 550;
 const LAST_MOVE_GLOW_MS = 5000;
 let timeMode = TIME_MODES[0];
 let clocks = null;
@@ -420,7 +422,7 @@ function startMatch(fromNet) {
   if (typeof updateReadyUI === "function") updateReadyUI();
   if (net.vsBot && state && !state.over && state.turn !== net.color) {
     cancelBotTimer();
-    botTimer = setTimeout(botPlay, 500);
+    botTimer = setTimeout(botPlay, 1000);
   }
 }
 
@@ -773,7 +775,8 @@ function stopTick() {
 }
 function onTick(now) {
   tickId = requestAnimationFrame(onTick);
-  if (!state || state.over || !clocks || !started) return;
+ const isMoving = moveAnim && (now - moveAnim.start < MOVE_SPEED_MS);
+  if (!state || (!started && !isMoving) || !clocks) return;
   const dt = now - lastTick;
   lastTick = now;
   const side = state.turn;
@@ -805,7 +808,6 @@ function finish(winner, reason, fromNet) {
   started = false;
   setPlayingUI(false);
   selected = null; hints = [];
-  stopTick();
   if (typeof clearChatLog === "function") clearChatLog();
   paintClocks();
   setStatus();
@@ -840,6 +842,12 @@ function applyMove(mv, fromNet, extra) {
   const cap = state.board[mv.toR][mv.toC];
   const asWhat = walkAs(p);
   state.board = applyMoveBoard(state.board, mv);
+  moveAnim = {
+    fromC: mv.fromC, fromR: mv.fromR,
+    toC: mv.toC, toR: mv.toR,
+    piece: clonePiece(p),
+    start: performance.now()
+  };
   lastMove = {fromC: mv.fromC, fromR: mv.fromR, toC: mv.toC, toR: mv.toR, color: p.color};
   lastMoveTime = performance.now();
   const nowP = state.board[mv.toR][mv.toC];
@@ -897,7 +905,7 @@ function applyMove(mv, fromNet, extra) {
   if (net.online && !fromNet && !net.vsBot) relay({kind:"move", mv: mv});
   if (net.vsBot && !state.over && state.turn !== net.color) {
     cancelBotTimer();
-    botTimer = setTimeout(botPlay, 380);
+    botTimer = setTimeout(botPlay, 1000);
   }
 }
 
@@ -1540,6 +1548,7 @@ canvas.addEventListener("pointerdown", ev => {
   if (net.spectate) return;
   if (!started || !state || state.over) return;
   if (moveLock) return;
+  if (moveAnim && performance.now() - moveAnim.start < MOVE_SPEED_MS) return;
   const sq = cellFromEvent(ev);
   if (!sq) return;
   const p = state.board[sq.r][sq.c];
@@ -1573,7 +1582,6 @@ canvas.addEventListener("pointerdown", ev => {
     selected = null; hints = []; setStatus(); draw();
   }
 });
-
 function drawBoard() {
   ctx.fillStyle = "#e8c992";
   ctx.fillRect(0, 0, W, H);
@@ -1605,7 +1613,6 @@ function drawBoard() {
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("SÔNG", x0 + 4 * CELL, y0 + 4.5 * CELL);
 }
-
 function drawPiece(p, c, r, checkedKing) {
   const x = MARGIN + viewC(c) * CELL, y = MARGIN + viewR(r) * CELL, rad = CELL * 0.407;
   const isCheckKing = checkedKing && p.type === "K" && p.color === checkedKing;
@@ -1660,15 +1667,55 @@ function draw() {
     ctx.fill();
     if (h.capture) { ctx.strokeStyle = "#c62828"; ctx.lineWidth = 2; ctx.stroke(); }
   }
+  
   const checkedKing = (started && !state.over && inCheck(state.board, state.turn)) ? state.turn : null;
+  const now = performance.now();
+  const isMoving = moveAnim && (now - moveAnim.start < MOVE_SPEED_MS);
+
+  // 1. Vẽ các quân cờ tĩnh
   for (let r = 0; r < ROWS; r++) {
     const row = state.board[r];
     for (let c = 0; c < COLS; c++) {
-      if (row[c]) drawPiece(row[c], c, r, checkedKing);
+      if (row[c]) {
+        // Ô đích của quân đang trượt sẽ không vẽ tĩnh cho đến khi trượt xong
+        if (isMoving && c === moveAnim.toC && r === moveAnim.toR) continue;
+        drawPiece(row[c], c, r, checkedKing);
+      }
     }
   }
-}
 
+  // 2. Vẽ quân cờ đang lướt mượt mà giữa 2 ô
+  if (isMoving) {
+    const progress = Math.min(1, (now - moveAnim.start) / MOVE_SPEED_MS);
+    const ease = 1 - Math.pow(1 - progress, 3); // Giảm tốc êm dịu khi tới đích
+    const startX = MARGIN + viewC(moveAnim.fromC) * CELL;
+    const startY = MARGIN + viewR(moveAnim.fromR) * CELL;
+    const endX = MARGIN + viewC(moveAnim.toC) * CELL;
+    const endY = MARGIN + viewR(moveAnim.toR) * CELL;
+    const curX = startX + (endX - startX) * ease;
+    const curY = startY + (endY - startY) * ease;
+
+    const rad = CELL * 0.407;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(curX, curY, rad, 0, Math.PI * 2);
+    ctx.fillStyle = moveAnim.piece.revealed ? "#f7ecd0" : "#5a3514";
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 4;
+    ctx.fill();
+
+    if (moveAnim.piece.revealed) {
+      ctx.font = pieceFont;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const ch = GLYPH[moveAnim.piece.color][moveAnim.piece.type];
+      ctx.fillStyle = moveAnim.piece.color === "red" ? "#c4161c" : "#111";
+      ctx.fillText(ch, curX, curY + 0.4);
+    }
+    ctx.restore();
+  }
+}
 function paintCaptures() {
   function fill(id, list, owner) {
     const box = document.getElementById(id);

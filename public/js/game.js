@@ -910,11 +910,11 @@ function applyMove(mv, fromNet, extra) {
 }
 
 const BOT_LEVELS = {
-  normal:      { label: "Trúc Cơ",    depth: 6,  timeMs: 1200,  mistakeChance: 0.03, samples: 2 },
-  hard:        { label: "Kim Đan",    depth: 8,  timeMs: 2200,  mistakeChance: 0,    samples: 2 },
-  master:      { label: "Hóa Thần",   depth: 12, timeMs: 4000,  mistakeChance: 0,    samples: 2 },
-  tribulation: { label: "Độ Kiếp",    depth: 16, timeMs: 10000, mistakeChance: 0,    samples: 6 },
-  immortal:    { label: "Chân Tiên",  depth: 20, timeMs: 20000, mistakeChance: 0,    samples: 10 }
+  normal:      { label: "Trúc Cơ",   depth: 3, timeMs: 600,  mistakeChance: 0.08, samples: 1 },
+  hard:        { label: "Kim Đan",   depth: 4, timeMs: 900,  mistakeChance: 0.02, samples: 1 },
+  master:      { label: "Hóa Thần",  depth: 4, timeMs: 1400, mistakeChance: 0,    samples: 2 },
+  tribulation: { label: "Độ Kiếp",   depth: 5, timeMs: 2000, mistakeChance: 0,    samples: 2 },
+  immortal:    { label: "Chân Tiên", depth: 6, timeMs: 3000, mistakeChance: 0,    samples: 2 }
 };
 const BOT_ADAPT_KEY = "coupBotAdapt";
 const BOT_BREAKTHROUGH_STREAK = 3;
@@ -1033,7 +1033,6 @@ function botEvaluate(board, color) {
   let score = 0;
   let myAdvisors = 0, oppAdvisors = 0;
   let myElephants = 0, oppElephants = 0;
-  let myMobility = 0, oppMobility = 0;
 
   for (let r = 0; r < ROWS; r++) {
     const row = board[r];
@@ -1042,36 +1041,46 @@ function botEvaluate(board, color) {
       if (!p) continue;
 
       let v = BOT_PIECE_VAL[p.type] || 0;
-      if (p.type === "P" && crossedRiver(p.color, r)) {
-        v += 110;
-        if (c >= 2 && c <= 6) v += 25;
-      } else if (p.type === "H" || p.type === "C") {
-        v += (4 - Math.abs(c - 4)) * 5;
+
+      // Thưởng vị trí chiến thuật
+      if (p.type === "P") {
+        if (crossedRiver(p.color, r)) {
+          v += 120; // Tốt qua sông rất mạnh
+          if (c >= 3 && c <= 5) v += 30; // Tốt áp sát trung lộ
+        }
+      } else if (p.type === "H") {
+        // Mã chiếm lộ đẹp, phạt mã nằm ở biên
+        v += (c === 0 || c === 8) ? -15 : (4 - Math.abs(c - 4)) * 6;
+      } else if (p.type === "C") {
+        // Pháo kiểm soát trung tâm
+        v += (4 - Math.abs(c - 4)) * 6;
       } else if (p.type === "R") {
-        v += (4 - Math.abs(c - 4)) * 3 + botRookOpenFileBonus(board, c);
+        // Xe chiếm lộ thông
+        v += (4 - Math.abs(c - 4)) * 4 + botRookOpenFileBonus(board, c);
       }
+
+      // Thưởng quân úp tiềm năng
       if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) {
-        v += 15;
+        v += 20;
       }
 
       if (p.color === color) {
         score += v;
         if (p.type === "A") myAdvisors++;
         else if (p.type === "E") myElephants++;
-        myMobility += rawMoves(board, c, r).length;
       } else {
         score -= v;
         if (p.type === "A") oppAdvisors++;
         else if (p.type === "E") oppElephants++;
-        oppMobility += rawMoves(board, c, r).length;
       }
     }
   }
 
-  score += (myMobility - oppMobility) * 3;
-  score += (myAdvisors - oppAdvisors) * 20 + (myElephants - oppElephants) * 18;
-  if (myAdvisors === 2) score += 12;
-  if (myElephants === 2) score += 12;
+  // Thưởng giữ cặp Sĩ - Tượng phòng thủ
+  score += (myAdvisors - oppAdvisors) * 25 + (myElephants - oppElephants) * 20;
+  if (myAdvisors === 2) score += 15;
+  if (myElephants === 2) score += 15;
+
   return score;
 }
 
@@ -1112,17 +1121,21 @@ function botTimeCheck() {
   if ((botNodes & 1023) === 0 && Date.now() > botDeadline) botTimeUp = true;
   return botTimeUp;
 }
-function botQuiesce(board, alpha, beta, color) {
-  if (botTimeCheck()) return 0;
+function botQuiesce(board, alpha, beta, color, qDepth = 0) {
+  if (botTimeCheck() || qDepth >= 3) return botEvaluate(board, color);
+  
   const standPat = botEvaluate(board, color);
   if (standPat >= beta) return beta;
   if (standPat > alpha) alpha = standPat;
+
   const opp = color === "red" ? "black" : "red";
   const moves = allLegal(board, color).filter(m => !!board[m.toR][m.toC]);
+  if (!moves.length) return alpha;
+
   const ordered = botOrderMoves(board, moves, null, -1);
   for (let i = 0; i < ordered.length; i++) {
     const nb = applyMoveBoard(board, ordered[i]);
-    const val = -botQuiesce(nb, -beta, -alpha, opp);
+    const val = -botQuiesce(nb, -beta, -alpha, opp, qDepth + 1);
     if (botTimeUp) return alpha;
     if (val >= beta) return beta;
     if (val > alpha) alpha = val;

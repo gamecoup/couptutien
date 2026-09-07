@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <!-- Khu vực bàn cờ đang chơi -->
+  <!-- ==================== 1. KHU VỰC BÀN CỜ ĐANG CHƠI ==================== -->
   <div id="gameWrap">
     <div class="wrap">
       <div class="board-row">
@@ -133,95 +133,159 @@
     </div>
     <div class="status" id="status" hidden></div>
   </div>
-
-  <!-- Trang chính (Home) -->
-  <div id="home">
-    <div class="home-brand-col">
-      <div class="home-brand" id="homeBrand">CỜ ÚP TU TIÊN</div>
-      <button id="btnBackHub" class="hub-back" type="button">↩ Trang chọn cờ</button>
-    </div>
-    <div class="home-music">
-      <button id="btnHomeMusic" type="button" aria-label="Bật/Tắt nhạc nền trang chính">🎵</button>
-      <input type="range" id="volHome" min="0" max="100" value="35" title="Nhạc trang chính" aria-label="Âm lượng nhạc nền trang chính">
-    </div>
-    <div class="home-row">
-      <div class="home-side">
-        <h2>Tìm đạo hữu</h2>
-        <div id="findBox">
-          <input id="findName" placeholder="Nhập đúng tên đạo hữu đang online" maxlength="24" aria-label="Tên đạo hữu cần tìm">
-          <button id="btnFind" type="button">Tìm</button>
-        </div>
-        <div id="findList"></div>
-        <button id="btnPlayNow" type="button">Chơi<br>ngay</button>
-      </div>
-
-      <div class="home-center">
-        <div class="id-card">
-          <button class="home-av" id="homeAv" type="button" title="Đổi ảnh đại diện"><span class="ph">🧙</span></button>
+     <!-- Trang chính (Home) -->
+  <div id="home" class="show">
+    <!-- ================= 1. THANH ĐIỀU HƯỚNG TRÊN CÙNG ================= -->
+    <header class="home-topbar">
+      <!-- Góc trái: Thẻ định danh người chơi -->
+      <div class="user-badge">
+        <div class="badge-av">
+          <button class="home-av" id="homeAv" type="button" title="Đổi ảnh đại diện">
+            <span class="ph">🧙</span>
+          </button>
           <input type="file" id="fileHome" accept="image/*" hidden>
-          <div class="av-actions">
+        </div>
+        <div class="badge-meta">
+          <div class="name-row">
+            <input id="homeName" maxlength="24" placeholder="Tên đạo hữu" readonly>
+            <button id="btnSaveName" class="ghost" type="button" hidden>Lưu</button>
+            <button id="btnLogout" class="btn-logout-icon" type="button" title="Đổi tài khoản / Đăng xuất" style="display:none">🚪</button>
+          </div>
+          <div class="home-stats" id="homeStats">Khách tu tiên</div>
+          <div class="av-actions" style="display:none">
             <button id="btnHomeSave" class="ghost" type="button" hidden>Lưu ảnh</button>
             <button id="btnHomeBrowse" class="ghost" type="button" hidden>Duyệt</button>
           </div>
-          <div class="name-row">
-            <input id="homeName" maxlength="24" placeholder="6-24 ký tự, không dấu" readonly>
-            <button id="btnSaveName" class="ghost" type="button" hidden>Lưu tên</button>
+        </div>
+      </div>
+
+      <!-- Giữa: Tên game cổ trang -->
+      <div class="brand-center">
+        <h1 class="home-brand" id="homeBrand">CỜ ÚP TU TIÊN</h1>
+        <button id="btnBackHub" style="display:none !important" type="button"></button>
+      </div>
+
+      <!-- Góc phải: Công cụ & Âm nhạc -->
+      <div class="top-utilities">
+        <!-- Đạo hữu online -->
+        <div class="tool-dropdown-wrap">
+          <button id="btnOnline" class="top-tool-btn" type="button">👥 0 Online</button>
+          <div id="onlinePop">
+            <div class="online-head">Đạo hữu đang online</div>
+            <div id="onlineList"></div>
           </div>
-          <div class="home-stats" id="homeStats"></div>
-          <button id="btnBlockInv" class="ghost" type="button">Cho phép lời mời</button>
         </div>
-        <p class="hint" id="homeHint">Chọn cách vào sảnh cờ.</p>
-        <div id="authBtns">
-          <button id="btnLogout" class="secondary" type="button" style="display:none">Đăng xuất</button>
+
+        <!-- Nhận lời mời -->
+        <button id="btnBlockInv" class="top-tool-btn" type="button">🛡️ Nhận mời</button>
+
+        <!-- Nhạc nền -->
+        <div class="home-music">
+          <button id="btnHomeMusic" type="button" aria-label="Bật/Tắt nhạc nền">🎵</button>
+          <input type="range" id="volHome" min="0" max="100" value="35" title="Âm lượng nhạc">
         </div>
-        <button id="btnVsBot" class="btn-vs-bot" type="button">
-          <div class="bot-hero-art" aria-hidden="true">
-            <!-- Quân Tướng Đỏ -->
+      </div>
+    </header>
+
+    <!-- ================= 2. KHU VỰC TRUNG TÂM (CHÍNH) ================= -->
+    <main class="home-main-stage">
+      <!-- Tầng 1: Chọn Thể Thức Cờ (2 Quân cờ 3D to bản) -->
+      <section class="chess-selector-zone">
+        <div class="zone-title" id="homeHint">CHỌN THỂ THỨC GIAO ĐẤU</div>
+        <div class="chess-pieces-duo">
+          <button id="btnPickTuong" class="piece-btn tuong" type="button">
+            <span class="art" aria-hidden="true">
+              <span class="disc front">將</span>
+              <span class="disc back">帥</span>
+            </span>
+            <span class="piece-lab">Cờ Tướng</span>
+          </button>
+          <button id="btnPickUp" class="piece-btn up" type="button">
+            <span class="art" aria-hidden="true">
+              <span class="disc hid"></span>
+              <span class="disc front small">將</span>
+            </span>
+            <span class="piece-lab">Cờ Úp</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tầng 2: 3 Nút Chức Năng Thi Đấu (Đồng bộ khung ngọc / đồng) -->
+      <section class="action-trio-zone">
+        <!-- Nút 1: Chơi ngay (Ánh Kim Hoàng Gia) -->
+        <button id="btnPlayNow" class="mode-action-btn btn-play-quick" type="button">
+          <span class="btn-icon">⚡</span>
+          <div class="btn-content">
+            <span class="btn-main-title">CHƠI NGAY</span>
+            <span class="btn-sub-title">Ghép trận nhanh ngẫu nhiên</span>
+          </div>
+        </button>
+
+        <!-- Nút 2: Khiêu chiến AI (Lục Bảo Thạch) -->
+        <button id="btnVsBot" class="mode-action-btn btn-play-bot btn-vs-bot" type="button">
+          <span class="btn-icon">🤖</span>
+          <div class="btn-content">
+            <span class="btn-main-title hero-title">KHIÊU CHIẾN AI</span>
+            <span class="btn-sub-title hero-sub">Luyện công 5 cảnh giới</span>
+          </div>
+          <!-- Giữ container ẩn cho robot svg để tránh lỗi code cũ -->
+          <div class="bot-hero-art" style="display:none" aria-hidden="true">
             <div class="disc-deco disc-left">帥</div>
-
-            <!-- Robot đang suy ngẫm (Bánh răng xoay + Tia ý nghĩ) -->
-            <div class="bot-thinking">
-              <svg class="thought-sparkle" viewBox="0 0 24 24">
-                <path d="M12 2L13.5 7.5L19 9L13.5 10.5L12 16L10.5 10.5L5 9L10.5 7.5L12 2Z" fill="#ffe082"/>
-              </svg>
-              <svg class="bot-face" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Anten & Đèn phát sáng -->
-                <line x1="32" y1="12" x2="32" y2="4" stroke="#ffe082" stroke-width="3" stroke-linecap="round"/>
-                <circle cx="32" cy="4" r="3.5" fill="#ffd54f"/>
-                
-                <!-- Đầu Robot -->
-                <rect x="12" y="12" width="40" height="34" rx="10" fill="url(#botHeadGrad)" stroke="#ffe082" stroke-width="2.5"/>
-                <rect x="7" y="24" width="5" height="10" rx="2" fill="#d7ccc8"/>
-                <rect x="52" y="24" width="5" height="10" rx="2" fill="#d7ccc8"/>
-                
-                <!-- Màn hình mắt -->
-                <rect x="18" y="19" width="28" height="16" rx="6" fill="#120c08"/>
-                <!-- Mắt đang tính toán (LED xanh) -->
-                <circle class="bot-eye eye-l" cx="25" cy="27" r="3" fill="#80cbc4"/>
-                <circle class="bot-eye eye-r" cx="39" cy="27" r="3" fill="#80cbc4"/>
-                
-                <!-- Miệng mạch điện tử -->
-                <path d="M24 39H40" stroke="#8d6e63" stroke-width="2" stroke-linecap="round"/>
-                
-                <defs>
-                  <linearGradient id="botHeadGrad" x1="12" y1="12" x2="52" y2="46" gradientUnits="userSpaceOnUse">
-                    <stop stop-color="#5d4037"/>
-                    <stop offset="1" stop-color="#3e2723"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <!-- Bánh răng xoay biểu thị suy ngẫm -->
-              <div class="gear-cog">⚙</div>
-            </div>
-
-            <!-- Quân Tướng Đen -->
+            <div class="bot-thinking"><div class="gear-cog">⚙</div></div>
             <div class="disc-deco disc-right">將</div>
           </div>
+        </button>
+
+        <!-- Nút 3: Sảnh bàn cờ (Gỗ Mun Cổ Điển) -->
+        <button id="btnHallHome" class="mode-action-btn btn-play-hall" type="button">
+          <span class="btn-icon">📜</span>
+          <div class="btn-content">
+            <span class="btn-main-title">SẢNH BÀN CỜ</span>
+            <span class="btn-sub-title">Chọn phòng & xem kỳ đài</span>
+          </div>
+        </button>
+      </section>
+    </main>
+
+    <!-- ================= 3. THANH DƯỚI: TÌM ĐẠO HỮU GỌN GÀNG ================= -->
+    <footer class="home-bottom-dock">
+      <div id="findBox" class="dock-find-wrap">
+        <span class="dock-find-icon">🔍</span>
+        <input id="findName" placeholder="Nhập tên đạo hữu..." maxlength="24">
+        <button id="btnFind" type="button">Tìm</button>
+        <div id="findList" class="find-dropdown-results"></div>
+      </div>
+    </footer>
+  </div>
+        <!-- Cụm chọn thể thức cờ -->
+        <div class="home-modes-wrap">
+          <p class="hint" id="homeHint">Chọn thể thức cờ:</p>
+          <div class="home-modes-row">
+            <button id="btnPickTuong" class="piece-btn tuong" type="button">
+              <span class="art" aria-hidden="true">
+                <span class="disc front">將</span>
+                <span class="disc back">帥</span>
+              </span>
+              <span class="piece-lab">Cờ Tướng</span>
+            </button>
+            <button id="btnPickUp" class="piece-btn up" type="button">
+              <span class="art" aria-hidden="true">
+                <span class="disc hid"></span>
+                <span class="disc front small">將</span>
+              </span>
+              <span class="piece-lab">Cờ Úp</span>
+            </button>
+          </div>
+        </div>
+
+        <button id="btnVsBot" class="btn-vs-bot" type="button">
+          <!-- Giữ nguyên nội dung nút robot AI như cũ -->
           <div class="hero-title">KHIÊU CHIẾN KỲ THỦ AI</div>
           <div class="hero-sub">Tỷ thí trí tuệ · Luyện công cờ tướng</div>
         </button>
       </div>
 
+      <!-- Cột Phải -->
       <div class="home-side">
         <h2>Sảnh cờ</h2>
         <p class="hint">Các bàn đang chờ hoặc đang đấu.</p>
@@ -235,49 +299,44 @@
     </div>
   </div>
 
-  <!-- Chọn thể thức cờ (Hub) -->
-  <div id="hub">
-    <button id="btnHubLogin" class="hub-back hub-login" type="button">↩ Đăng nhập</button>
-    <div class="hub-brand">CỜ ÚP TU TIÊN</div>
-    <p class="hub-lead">Chọn môn cờ sau khi vào sảnh</p>
-    <div class="hub-row">
-      <button id="btnPickTuong" class="piece-btn tuong" type="button">
-        <span class="art" aria-hidden="true">
-          <span class="disc front">將</span>
-          <span class="disc back">帥</span>
-        </span>
-        <span class="piece-lab">Cờ Tướng</span>
-      </button>
-      <button id="btnPickUp" class="piece-btn up" type="button">
-        <span class="art" aria-hidden="true">
-          <span class="disc hid"></span>
-          <span class="disc front small">將</span>
-        </span>
-        <span class="piece-lab">Cờ Úp</span>
-      </button>
-    </div>
+  <!-- Sảnh chọn cờ cũ giữ lại dạng ẩn để đảm bảo an toàn cho các listener cũ của JS nếu có -->
+  <div id="hub" style="display:none !important">
+    <button id="btnHubLogin" style="display:none !important" type="button"></button>
   </div>
 
-  <!-- Cửa sổ Đăng nhập -->
+  <!-- ==================== 3. POPUP ĐĂNG NHẬP KÍNH MỜ (GLASSMORPHISM) ==================== -->
   <div id="loginGate" class="show">
     <div class="login-card">
-      <h1>Cờ Úp Tu Tiên</h1>
-
-      <div class="login-mark chess-cluster">
-        <div class="cluster-piece wood-red">帥</div>
-        <div class="cluster-piece quartz-up"></div>
-        <div class="cluster-piece wood-black">兵</div>
-      </div>
+      <h2>CỜ ÚP TU TIÊN</h2>
+      <p class="login-sub">Chọn phương thức nhập đạo hữu</p>
       
-      <p class="hint">Vào sảnh bằng một chạm. Tài khoản mạng xã hội chỉ dùng để xác thực.</p>
-      <button id="btnLoginGuest" class="login-guest" type="button">Chơi với tư cách khách</button>
-      <button id="btnGoogle" class="login-google" type="button">Đăng nhập bằng Google</button>
-      <button id="btnFacebook" class="login-fb" type="button">Đăng nhập bằng Facebook</button>
+      <div class="login-action-list">
+        <button id="btnLoginGuest" class="login-btn-item guest-btn" type="button">
+          <span class="login-btn-icon">👤</span> Chơi Ẩn Danh (Khách)
+        </button>
+        <button id="btnGoogle" class="login-btn-item google-btn" type="button">
+          <span class="login-btn-icon">🇬</span> Đăng nhập bằng Google
+        </button>
+        <button id="btnFacebook" class="login-btn-item fb-btn" type="button">
+          <span class="login-btn-icon">🇫</span> Đăng nhập bằng Facebook
+        </button>
+      </div>
+
       <p class="hint" id="oauthHint"></p>
     </div>
   </div>
 
-  <!-- Các Popups Thông báo & Xác nhận -->
+  <!-- ==================== 4. SẢNH CHỜ (HALL) ==================== -->
+  <div id="hall">
+    <div class="hall-top">
+      <button id="btnHallBack" class="secondary" type="button">← Trang chính</button>
+      <h2>Sảnh bàn cờ</h2>
+      <p class="hint" id="hallHint">Kéo trái/phải để chọn bàn.</p>
+    </div>
+    <div id="hallStrip"></div>
+  </div>
+
+  <!-- ==================== 5. CÁC POPUP TIỆN ÍCH ==================== -->
   <div id="profilePop">
     <div class="ov-box">
       <div class="ov-title">Tạo hồ sơ đạo hữu</div>
@@ -329,15 +388,6 @@
     </div>
   </div>
 
-  <div id="hall">
-    <div class="hall-top">
-      <button id="btnHallBack" class="secondary" type="button">← Trang chính</button>
-      <h2>Sảnh bàn cờ</h2>
-      <p class="hint" id="hallHint">Kéo trái/phải để chọn bàn.</p>
-    </div>
-    <div id="hallStrip"></div>
-  </div>
-
   <div id="profPop">
     <div class="ov-box">
       <div class="ov-title" id="profName">Hồ sơ</div>
@@ -359,7 +409,7 @@
     </div>
   </div>
 
-  <!-- Âm thanh game -->
+  <!-- Audio -->
   <audio id="audGame" loop preload="metadata" src="/audio/spirit-song.mp3"></audio>
   <audio id="audHome" loop preload="metadata" src="/audio/lotus-dew.mp3"></audio>
 

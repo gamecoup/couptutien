@@ -411,13 +411,13 @@ function onNetMsg(ev) {
       if (typeof paintSeats === "function") paintSeats();
       net.guest = false;
       if (oauthLoginPending) {
-        oauthLoginPending = false;
-        clearRoomState(true);
-        goHub();
-        document.getElementById("loginGate").classList.remove("show");
-        document.getElementById("home").classList.remove("show");
-        document.getElementById("gameWrap").classList.remove("show");
-        document.getElementById("hub").classList.add("show");
+      oauthLoginPending = false;
+      clearRoomState(true);
+      // Đóng cổng đăng nhập và hiển thị thẳng Trang chính (Home)
+      document.getElementById("loginGate").classList.remove("show");
+      document.getElementById("home").classList.add("show");
+      document.getElementById("gameWrap").classList.remove("show");
+      document.getElementById("hub").classList.remove("show");
       }
       document.getElementById("loginGate").classList.remove("show");
       document.getElementById("authPop").classList.remove("show");
@@ -574,24 +574,21 @@ function scheduleReconnect() {
 window.addEventListener("online", function () {
   if (!net.ws || net.ws.readyState === 3) connectNet();
 });
-
 function goLogin() {
   hideHall();
-  document.getElementById("hub").classList.add("show");
-  document.getElementById("home").classList.remove("show");
+  document.getElementById("hub").classList.remove("show");
+  document.getElementById("home").classList.add("show");
   document.getElementById("gameWrap").classList.remove("show");
   document.getElementById("loginGate").classList.add("show");
 }
-
 function goHub() {
   hideHall();
   document.getElementById("loginGate").classList.remove("show");
-  document.getElementById("home").classList.remove("show");
+  document.getElementById("home").classList.add("show");
   document.getElementById("gameWrap").classList.remove("show");
-  document.getElementById("hub").classList.add("show");
+  document.getElementById("hub").classList.remove("show");
   net.vsBot = false;
 }
-
 function clearRoomState(sendLeave) {
   if (sendLeave && net.room) netSend({ type: "leave" });
   net.room = null;
@@ -794,17 +791,21 @@ function applyAuthUI() {
   var isAuth = signedIn();
   if (out) out.style.display = isAuth ? "inline-block" : "none";
   if (gate) gate.classList.toggle("show", !isAuth);
+
+  var onGame = document.getElementById("gameWrap").classList.contains("show");
+
   if (isAuth) {
-    var onGame = document.getElementById("gameWrap").classList.contains("show");
-    var onHome = document.getElementById("home").classList.contains("show");
-    if (!onGame && !onHome) {
-      document.getElementById("hub").classList.add("show");
-      document.getElementById("loginGate").classList.remove("show");
+    // Đã đăng nhập: tắt cổng đăng nhập, nếu không trong bàn chơi thì hiển thị trang chính
+    if (!onGame) {
+      document.getElementById("home").classList.add("show");
     }
+    document.getElementById("loginGate").classList.remove("show");
+    document.getElementById("hub").classList.remove("show");
   } else {
-    document.getElementById("home").classList.remove("show");
+    // Chưa đăng nhập: giữ trang chính làm nền để cửa sổ kính mờ nhìn xuyên thấu vào
+    document.getElementById("home").classList.add("show");
     document.getElementById("gameWrap").classList.remove("show");
-    document.getElementById("hub").classList.add("show");
+    document.getElementById("hub").classList.remove("show");
   }
   var hint = document.getElementById("homeHint");
   if (!hint) return;

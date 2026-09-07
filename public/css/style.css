@@ -1846,12 +1846,9 @@ canvas {
     left: auto;
   }
   .spec-box {
-    grid-column: 1;
-    grid-row: 3;
-    justify-self: start;
-    align-self: center;
-    margin-left: -6px;
-    position: relative;
+    position: absolute;
+    top: 42px;
+    left: 6px;
     z-index: 5;
     width: 30px;
     height: 30px;
@@ -1916,63 +1913,76 @@ canvas {
     height: 168px;
   }
 
-  /* Home Mobile */
+  /* Home Mobile - Tối ưu 1 màn hình */
   #home {
-    padding: 10px 12px 10px;
-    justify-content: flex-start;
-    gap: 16px;
+    padding: 10px 14px;
+    justify-content: space-between;
+    overflow: hidden;
   }
   .home-topbar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .brand-center {
-    order: -1;
-    width: 100%;
-    text-align: center;
+    padding-bottom: 6px;
+    gap: 6px;
   }
   .brand-center .home-brand {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
+    letter-spacing: 0.12em;
   }
-  .user-badge {
-    padding: 3px 10px 3px 4px;
+  .top-tool-btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
   }
-  .user-badge .home-av {
-    width: 36px;
-    height: 36px;
+  .home-main-stage {
+    gap: 12px;
+    margin: 4px 0;
   }
-  .badge-meta #homeName {
-    width: 90px;
-    font-size: 0.85rem;
+  .zone-title {
+    font-size: 0.75rem;
+    margin-bottom: 6px;
   }
   .chess-pieces-duo {
-    gap: 16px;
+    gap: 20px;
   }
   .chess-pieces-duo .piece-btn {
-    width: 105px;
+    width: 95px;
   }
   .chess-pieces-duo .piece-btn .art {
-    width: 92px;
-    height: 92px;
+    width: 82px;
+    height: 82px;
+    border-width: 4px;
+  }
+  .chess-pieces-duo .piece-btn .piece-lab {
+    font-size: 0.95rem;
   }
   .action-trio-zone {
     flex-direction: column;
     width: 100%;
-    gap: 10px;
+    max-width: 340px;
+    gap: 8px;
   }
   .mode-action-btn {
     max-width: 100%;
-    min-height: 58px;
-    padding: 10px 14px;
+    min-height: 64px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    gap: 12px;
   }
-}
-
-@media (min-width: 769px) {
-  .side-clocks.flip {
-    flex-direction: column !important;
+  .btn-icon {
+    font-size: 24px;
   }
-  .left-col.flip {
-    transform: none !important;
+  .btn-main-title {
+    font-size: 0.98rem;
+  }
+  .btn-sub-title {
+    font-size: 0.68rem;
+  }
+  .home-bottom-dock {
+    transform: none;
+    margin-bottom: 6px;
+  }
+  .dock-find-wrap {
+    width: 100%;
+    max-width: 320px;
+    padding: 2px 4px 2px 10px;
   }
 }
 

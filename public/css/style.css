@@ -592,37 +592,32 @@ canvas {
   width: 92px;
   vertical-align: middle;
 }
-/* Vị trí 1: Chính giữa đỉnh thanh điều khiển */
-  .spec-box {
-    position: absolute;
-    top: 14px;                   /* Thẳng hàng với tâm của nút loa và nút thoát */
-    left: 50%;                  /* Đưa ra chính giữa màn hình */
-    transform: translateX(-50%); /* Cân bằng chuẩn giữa */
-    right: auto;
-    z-index: 10;
-    pointer-events: none;       /* Tránh che khuất thao tác chạm */
-
-    font-size: 0.95rem;
-    font-weight: 300;
-    color: #81c784;
-
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    width: auto;
-    height: auto;
-    min-height: unset;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-    padding: 0;
-  }
-  .spec-box .spec-lab {
-    font-size: 0.65rem;
-    font-weight: 300;
-    color: #81c784;
-    opacity: 0.8;
-  }
+.spec-box {
+  width: 96px;
+  height: 96px;
+  min-height: 96px;
+  border-radius: 50%;
+  border: 4px solid #81c784;
+  background: #1b5e20;
+  color: #f3e5f5;
+  font-weight: 900;
+  font-size: 1.45rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.05;
+  padding: 6px;
+  box-shadow: 0 0 12px #66bb6aaa, 0 3px 10px #0006;
+}
+.spec-box .spec-lab {
+  font-size: 0.72rem;
+  color: #f8bbd0;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  margin-top: 1px;
+}
 /* Chat & Nhật ký ván đấu */
 .chat-wrap {
   position: relative;
@@ -1851,16 +1846,20 @@ canvas {
   }
   .spec-box {
     position: absolute;
-    top: 8px;
-    right: 44px;
-    left: auto;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    right: auto;
     z-index: 10;
+    pointer-events: none;
+
     font-size: 0.95rem;
     font-weight: 300;
     color: #81c784;
+
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     width: auto;
     height: auto;
     min-height: unset;

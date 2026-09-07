@@ -15,6 +15,31 @@ function escapeNetHtml(value) {
   });
 }
 
+// Hàm tự động cắt vuông và nén ảnh avatar siêu nhẹ (~15KB - 20KB) chống diss mạng
+function compressAvatarFile(file, callback) {
+  if (!file || !file.type.startsWith("image/")) return;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement("canvas");
+      var size = 128;
+      canvas.width = size;
+      canvas.height = size;
+      var ctx = canvas.getContext("2d");
+
+      var minSide = Math.min(img.width, img.height);
+      var sx = (img.width - minSide) / 2;
+      var sy = (img.height - minSide) / 2;
+
+      ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+      callback(canvas.toDataURL("image/jpeg", 0.8));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 // Helpers thao tác DOM an toàn, chống văng lỗi nếu thiếu element
 function safeEl(id) {
   return document.getElementById(id);
@@ -942,10 +967,8 @@ function showInvite(msg) {
   }
 
   function handleAvatarSelect(file) {
-    if (!file || !file.type.startsWith("image/")) return;
-    var rd = new FileReader();
-    rd.onload = function () {
-      pendingAvatarData = rd.result;
+    compressAvatarFile(file, function (compressedData) {
+      pendingAvatarData = compressedData;
       var el = safeEl("homeAv");
       oldAvatarHtml = el ? el.innerHTML : "";
       if (el) el.innerHTML = '<img alt="" src="' + pendingAvatarData + '">';
@@ -959,8 +982,7 @@ function showInvite(msg) {
       if (authNewPass) authNewPass.style.display = "none";
       if (authPop) authPop.classList.add("show");
       pendingAuth = "avatar";
-    };
-    rd.readAsDataURL(file);
+    });
   }
 
   safeClick("homeAv", function (ev) {

@@ -25,13 +25,13 @@
                     <button id="btnSpeaker" type="button" title="Âm thanh" aria-label="Cài đặt âm thanh">🔊</button>
                     <div class="sound-pop">
                       <label><input type="checkbox" id="chkMusic" checked> Nhạc nền</label>
-                      <label>Nhạc <input type="range" id="volMusic" min="0" max="100" value="40"></label>
+                      <label>Nhạc <input type="range" id="volMusic" min="0" max="100" value="40" aria-label="Âm lượng nhạc nền"></label>
                       <label><input type="checkbox" id="chkSfx" checked> Tiếng động</label>
-                      <label>Hiệu ứng <input type="range" id="volSfx" min="0" max="100" value="80"></label>
+                      <label>Hiệu ứng <input type="range" id="volSfx" min="0" max="100" value="80" aria-label="Âm lượng hiệu ứng"></label>
                     </div>
                   </div>
                   <div class="time-wrap" id="timeWrap">
-                    <button id="btnTime" type="button" aria-label="Thời gian ván">⏱</button>
+                    <button id="btnTime" type="button" title="Thời gian ván" aria-label="Thời gian ván">⏱</button>
                     <div class="time-pop" id="modes"></div>
                   </div>
                 </div>
@@ -78,7 +78,7 @@
                   <circle class="track" cx="36" cy="36" r="32"></circle>
                   <circle class="prog" id="ringRed" cx="36" cy="36" r="32"></circle>
                 </svg>
-                <button class="avatar" id="avRed" type="button" title="Tải ảnh Đỏ"><span class="ph">🔴</span></button>
+                <button class="avatar" id="avRed" type="button" title="Tải ảnh Đỏ" aria-label="Tải ảnh Đỏ"><span class="ph">🔴</span></button>
                 <div class="move-num" id="mvRed">—</div>
               </div>
               <input type="file" id="fileRed" accept="image/*" hidden>
@@ -97,7 +97,7 @@
                 <div class="chat-wrap" id="chatWrap">
                   <button id="btnChat" type="button">💬 Chat</button>
                   <div class="chat-pop" id="chatPop">
-                    <textarea id="chatText" rows="2" maxlength="80" placeholder="Nhập lời..."></textarea>
+                    <textarea id="chatText" rows="2" maxlength="80" placeholder="Nhập lời..." aria-label="Nội dung chat"></textarea>
                     <button id="btnChatSend" type="button">Gửi</button>
                   </div>
                 </div>
@@ -116,7 +116,7 @@
                   <circle class="track" cx="36" cy="36" r="32"></circle>
                   <circle class="prog" id="ringBlack" cx="36" cy="36" r="32"></circle>
                 </svg>
-                <button class="avatar" id="avBlack" type="button" title="Tải ảnh Đen"><span class="ph">⚫</span></button>
+                <button class="avatar" id="avBlack" type="button" title="Tải ảnh Đen" aria-label="Tải ảnh Đen"><span class="ph">⚫</span></button>
                 <div class="move-num" id="mvBlack">—</div>
               </div>
               <input type="file" id="fileBlack" accept="image/*" hidden>
@@ -133,23 +133,24 @@
     </div>
     <div class="status" id="status" hidden></div>
   </div>
-     <!-- Trang chính (Home) -->
+
+  <!-- ==================== 2. TRANG CHÍNH (HOME) ==================== -->
   <div id="home" class="show">
-    <!-- ================= 1. THANH ĐIỀU HƯỚNG TRÊN CÙNG ================= -->
+    <!-- 1. Thanh điều hướng trên cùng -->
     <header class="home-topbar">
       <!-- Góc trái: Thẻ định danh người chơi -->
       <div class="user-badge">
         <div class="badge-av">
-          <button class="home-av" id="homeAv" type="button" title="Đổi ảnh đại diện">
+          <button class="home-av" id="homeAv" type="button" title="Đổi ảnh đại diện" aria-label="Đổi ảnh đại diện">
             <span class="ph">🧙</span>
           </button>
           <input type="file" id="fileHome" accept="image/*" hidden>
         </div>
         <div class="badge-meta">
           <div class="name-row">
-            <input id="homeName" maxlength="24" placeholder="Tên đạo hữu" readonly>
+            <input id="homeName" maxlength="24" placeholder="Tên đạo hữu" readonly autocomplete="off">
             <button id="btnSaveName" class="ghost" type="button" hidden>Lưu</button>
-            <button id="btnLogout" class="btn-logout-icon" type="button" title="Đổi tài khoản / Đăng xuất" style="display:none">🚪</button>
+            <button id="btnLogout" class="btn-logout-icon" type="button" title="Đổi tài khoản / Đăng xuất" aria-label="Đăng xuất" style="display:none">🚪</button>
           </div>
           <div class="home-stats" id="homeStats">Khách tu tiên</div>
           <div class="av-actions" style="display:none">
@@ -162,7 +163,7 @@
       <!-- Giữa: Tên game cổ trang -->
       <div class="brand-center">
         <h1 class="home-brand" id="homeBrand">CỜ ÚP TU TIÊN</h1>
-        <button id="btnBackHub" style="display:none !important" type="button"></button>
+        <button id="btnBackHub" style="display:none !important" type="button" aria-hidden="true"></button>
       </div>
 
       <!-- Góc phải: Công cụ & Âm nhạc -->
@@ -181,15 +182,15 @@
 
         <!-- Nhạc nền -->
         <div class="home-music">
-          <button id="btnHomeMusic" type="button" aria-label="Bật/Tắt nhạc nền">🎵</button>
-          <input type="range" id="volHome" min="0" max="100" value="35" title="Âm lượng nhạc">
+          <button id="btnHomeMusic" type="button" title="Bật/Tắt nhạc nền" aria-label="Bật/Tắt nhạc nền">🎵</button>
+          <input type="range" id="volHome" min="0" max="100" value="35" title="Âm lượng nhạc" aria-label="Âm lượng nhạc nền sảnh">
         </div>
       </div>
     </header>
 
-    <!-- ================= 2. KHU VỰC TRUNG TÂM (CHÍNH) ================= -->
+    <!-- 2. Khu vực trung tâm chính -->
     <main class="home-main-stage">
-      <!-- Tầng 1: Chọn Thể Thức Cờ (2 Quân cờ 3D to bản) -->
+      <!-- Tầng 1: Chọn Thể Thức Cờ (2 Quân cờ 3D) -->
       <section class="chess-selector-zone">
         <div class="zone-title" id="homeHint">CHỌN THỂ THỨC GIAO ĐẤU</div>
         <div class="chess-pieces-duo">
@@ -210,9 +211,9 @@
         </div>
       </section>
 
-      <!-- Tầng 2: 3 Nút Chức Năng Thi Đấu (Đồng bộ khung ngọc / đồng) -->
+      <!-- Tầng 2: 3 Nút Chức Năng Thi Đấu -->
       <section class="action-trio-zone">
-        <!-- Nút 1: Chơi ngay (Ánh Kim Hoàng Gia) -->
+        <!-- Nút 1: Chơi ngay -->
         <button id="btnPlayNow" class="mode-action-btn btn-play-quick" type="button">
           <span class="btn-icon">⚡</span>
           <div class="btn-content">
@@ -221,14 +222,14 @@
           </div>
         </button>
 
-        <!-- Nút 2: Khiêu chiến AI (Lục Bảo Thạch) -->
+        <!-- Nút 2: Khiêu chiến AI -->
         <button id="btnVsBot" class="mode-action-btn btn-play-bot btn-vs-bot" type="button">
           <span class="btn-icon">🤖</span>
           <div class="btn-content">
             <span class="btn-main-title hero-title">KHIÊU CHIẾN AI</span>
             <span class="btn-sub-title hero-sub">Luyện công 5 cảnh giới</span>
           </div>
-          <!-- Giữ container ẩn cho robot svg để tránh lỗi code cũ -->
+          <!-- Container ẩn bảo tồn bộ phận đồ họa phụ -->
           <div class="bot-hero-art" style="display:none" aria-hidden="true">
             <div class="disc-deco disc-left">帥</div>
             <div class="bot-thinking"><div class="gear-cog">⚙</div></div>
@@ -236,7 +237,7 @@
           </div>
         </button>
 
-        <!-- Nút 3: Sảnh bàn cờ (Gỗ Mun Cổ Điển) -->
+        <!-- Nút 3: Sảnh bàn cờ -->
         <button id="btnHallHome" class="mode-action-btn btn-play-hall" type="button">
           <span class="btn-icon">📜</span>
           <div class="btn-content">
@@ -247,64 +248,23 @@
       </section>
     </main>
 
-    <!-- ================= 3. THANH DƯỚI: TÌM ĐẠO HỮU GỌN GÀNG ================= -->
+    <!-- 3. Thanh dưới: Tìm đạo hữu -->
     <footer class="home-bottom-dock">
       <div id="findBox" class="dock-find-wrap">
-        <span class="dock-find-icon">🔍</span>
-        <input id="findName" placeholder="Nhập tên đạo hữu..." maxlength="24">
+        <span class="dock-find-icon" aria-hidden="true">🔍</span>
+        <input id="findName" placeholder="Nhập tên đạo hữu..." maxlength="24" autocomplete="off" spellcheck="false" aria-label="Tìm đạo hữu">
         <button id="btnFind" type="button">Tìm</button>
         <div id="findList" class="find-dropdown-results"></div>
       </div>
     </footer>
   </div>
-        <!-- Cụm chọn thể thức cờ -->
-        <div class="home-modes-wrap">
-          <p class="hint" id="homeHint">Chọn thể thức cờ:</p>
-          <div class="home-modes-row">
-            <button id="btnPickTuong" class="piece-btn tuong" type="button">
-              <span class="art" aria-hidden="true">
-                <span class="disc front">將</span>
-                <span class="disc back">帥</span>
-              </span>
-              <span class="piece-lab">Cờ Tướng</span>
-            </button>
-            <button id="btnPickUp" class="piece-btn up" type="button">
-              <span class="art" aria-hidden="true">
-                <span class="disc hid"></span>
-                <span class="disc front small">將</span>
-              </span>
-              <span class="piece-lab">Cờ Úp</span>
-            </button>
-          </div>
-        </div>
 
-        <button id="btnVsBot" class="btn-vs-bot" type="button">
-          <!-- Giữ nguyên nội dung nút robot AI như cũ -->
-          <div class="hero-title">KHIÊU CHIẾN KỲ THỦ AI</div>
-          <div class="hero-sub">Tỷ thí trí tuệ · Luyện công cờ tướng</div>
-        </button>
-      </div>
-
-      <!-- Cột Phải -->
-      <div class="home-side">
-        <h2>Sảnh cờ</h2>
-        <p class="hint">Các bàn đang chờ hoặc đang đấu.</p>
-        <button id="btnHallHome" type="button">Sảnh bàn cờ</button>
-        <button id="btnOnline" class="ghost" type="button">0 người đang online</button>
-        <div id="onlinePop">
-          <div class="online-head">Đạo hữu đang online</div>
-          <div id="onlineList"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sảnh chọn cờ cũ giữ lại dạng ẩn để đảm bảo an toàn cho các listener cũ của JS nếu có -->
-  <div id="hub" style="display:none !important">
+  <!-- Sảnh chọn cờ cũ (giữ ẩn an toàn cho các listener cũ nếu có) -->
+  <div id="hub" style="display:none !important" aria-hidden="true">
     <button id="btnHubLogin" style="display:none !important" type="button"></button>
   </div>
 
-  <!-- ==================== 3. POPUP ĐĂNG NHẬP KÍNH MỜ (GLASSMORPHISM) ==================== -->
+  <!-- ==================== 3. POPUP ĐĂNG NHẬP KÍNH MỜ ==================== -->
   <div id="loginGate" class="show">
     <div class="login-card">
       <h2>CỜ ÚP TU TIÊN</h2>
@@ -341,7 +301,7 @@
     <div class="ov-box">
       <div class="ov-title">Tạo hồ sơ đạo hữu</div>
       <div class="ov-reason">Chọn tên duy nhất. Lần sau đăng nhập sẽ vào thẳng game.</div>
-      <input id="newProfileName" maxlength="24" placeholder="6-24 ký tự, không dấu">
+      <input id="newProfileName" maxlength="24" placeholder="6-24 ký tự, không dấu" autocomplete="off" spellcheck="false" aria-label="Tên đạo hữu mới">
       <div>
         <button id="btnProfileOk" type="button">Lưu tên và vào game</button>
       </div>
@@ -352,8 +312,8 @@
     <div class="ov-box">
       <div class="ov-title" id="authTitle">Xác nhận</div>
       <div class="ov-reason" id="authText"></div>
-      <input id="authOtp" placeholder="Mã OTP 6 số" maxlength="6" style="display:none;padding:8px;border-radius:8px;border:0;margin:8px">
-      <input id="authNewPass" type="password" placeholder="Mật khẩu mới" maxlength="32" style="display:none;padding:8px;border-radius:8px;border:0;margin:8px">
+      <input id="authOtp" placeholder="Mã OTP 6 số" maxlength="6" autocomplete="one-time-code" inputmode="numeric" style="display:none;padding:8px;border-radius:8px;border:0;margin:8px">
+      <input id="authNewPass" type="password" placeholder="Mật khẩu mới" maxlength="32" autocomplete="new-password" style="display:none;padding:8px;border-radius:8px;border:0;margin:8px">
       <div>
         <button id="btnAuthYes" type="button">Đồng ý</button>
         <button id="btnAuthNo" class="secondary" type="button">Hủy</button>
@@ -409,7 +369,7 @@
     </div>
   </div>
 
-  <!-- Audio -->
+  <!-- Âm thanh game -->
   <audio id="audGame" loop preload="metadata" src="/audio/spirit-song.mp3"></audio>
   <audio id="audHome" loop preload="metadata" src="/audio/lotus-dew.mp3"></audio>
 

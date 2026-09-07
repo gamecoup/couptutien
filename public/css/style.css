@@ -1,5 +1,9 @@
+/* =========================================================
+   1. THIẾT LẬP TOÀN CỤC & RESET
+   ========================================================= */
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -13,6 +17,46 @@ body {
   align-items: center;
 }
 
+button {
+  background: #8b4513;
+  color: #fff8e7;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 4px 4px 4px 0;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+button:hover {
+  background: #a0522d;
+}
+button.secondary {
+  background: #3e2723;
+}
+button.mode {
+  background: #3e2723;
+  min-width: 58px;
+  padding: 7px 8px;
+}
+button.mode.on {
+  background: #2e7d32;
+}
+button.sound.on {
+  background: #1565c0;
+}
+
+.status {
+  text-align: center;
+  margin: 6px;
+  font-weight: 700;
+  color: #ffe082;
+  min-height: 2.4em;
+}
+
+/* =========================================================
+   2. KHU VỰC BÀN CỜ (GAME PLAYING AREA)
+   ========================================================= */
 #gameWrap {
   display: none;
   width: 100%;
@@ -28,69 +72,51 @@ body:has(#loginGate.show) #gameWrap {
   display: none !important;
 }
 
-.status {
-  text-align: center;
-  margin: 6px;
-  font-weight: 700;
-  color: #ffe082;
-  min-height: 2.4em;
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: 10px 8px;
+  margin: 0 auto;
 }
 
-#hall:not(.show) {
-  display: none !important;
-}
-
-/* Tools & Thời gian */
-.board-tools,
-.mid-tools,
-.left-col,
-.time-wrap {
-  overflow: visible;
-}
-.time-wrap {
-  position: relative;
-  z-index: 40;
-}
-#btnTime {
-  margin: 0;
-  padding: 0;
-  font-size: 0.9rem;
-  background: #3e2723;
+#gameWrap #btnHome {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 7;
   width: 40px;
   height: 40px;
+  margin: 0;
   border-radius: 50%;
-}
-.time-pop {
-  display: none;
-  position: absolute;
-  left: 0;
-  top: 44px;
-  margin-left: 0;
-  background: #2a1d12;
-  border: 1px solid #5c4030;
-  border-radius: 8px;
-  padding: 6px;
-  z-index: 50;
-  min-width: 120px;
-  pointer-events: auto;
-}
-.time-wrap.open .time-pop {
-  display: block;
-}
-.time-wrap.locked .time-pop {
-  display: none !important;
-}
-.time-pop .mode {
-  display: block;
-  width: 100%;
-  margin: 3px 0;
-  pointer-events: auto;
-}
-.time-pop .mode:disabled {
-  opacity: 0.45;
+  font-size: 18px;
+  padding: 0;
+  background: #3e2723;
 }
 
-/* Cổng sẵn sàng & Nút điều khiển */
+.board-row,
+.play-area {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.board-stage {
+  position: relative;
+  display: inline-block;
+}
+
+canvas {
+  background: #e8c992;
+  border-radius: 6px;
+  box-shadow: 0 8px 28px #0008;
+  touch-action: none;
+  display: block;
+}
+
+/* Cổng sẵn sàng trên bàn cờ */
 #readyGate {
   position: absolute;
   inset: 0;
@@ -112,47 +138,63 @@ body:has(#loginGate.show) #gameWrap {
 #gameWrap.playing #btnStart {
   display: none !important;
 }
-#btnBack {
-  margin: 0;
-  padding: 6px 8px;
-  font-size: 0.72rem;
-  width: 100%;
+
+.gate-box {
+  text-align: center;
+  max-width: 320px;
+}
+.gate-box h2 {
+  margin: 0 0 10px;
+  color: #ffe082;
+}
+.gate-box .hint {
+  color: #d7c4a3;
+  font-size: 0.82rem;
+  margin: 10px 0 14px;
+  line-height: 1.4;
 }
 
-.wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-  padding: 10px 8px;
-  margin: 0 auto;
+#btnReady {
+  background: #2e7d32;
+  font-size: 1rem;
+  padding: 10px 22px;
 }
-#gameWrap #btnHome {
+#btnStart {
+  background: #2e7d32;
+  display: none;
+}
+#btnReady,
+#btnStart {
+  min-width: 132px;
+  min-height: 39px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+/* Cầu hòa trong ván */
+#drawAsk {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 7;
-  width: 40px;
-  height: 40px;
-  margin: 0;
-  border-radius: 50%;
-}
-.board-tools {
-  display: flex;
-  flex-direction: row;
+  inset: 0;
+  background: rgba(18, 10, 6, 0.78);
+  display: none;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.board-row,
-.play-area {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
   justify-content: center;
+  z-index: 6;
+  border-radius: 6px;
+}
+#drawAsk.show {
+  display: flex;
+}
+#drawAsk .box {
+  text-align: center;
+}
+#drawAsk .box button {
+  min-width: 110px;
 }
 
-/* Đồng hồ & Cột hai bên */
+/* =========================================================
+   3. CỘT ĐỒNG HỒ & THÔNG TIN NGƯỜI CHƠI
+   ========================================================= */
 .side-clocks {
   display: flex;
   flex-direction: column;
@@ -177,1256 +219,7 @@ body:has(#loginGate.show) #gameWrap {
 .side-clocks.flip > .player:last-of-type {
   order: 1;
 }
-/* =========================================================
-   GIAO DIỆN SẢNH CHÍNH (HOME) PHONG CÁCH CỔ TRANG TU TIÊN
-   ========================================================= */
 
-#home {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 16;
-  background: radial-gradient(circle at 50% 35%, #3d2310 0%, #1a100a 65%, #0d0805 100%);
-  color: #f3e6c8;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: stretch;
-  padding: 16px 24px 14px;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
-#home.show {
-  display: flex;
-}
-
-/* --- 1. TOPBAR TRÊN CÙNG --- */
-.home-topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(196, 165, 116, 0.2);
-}
-
-/* Thẻ định danh người chơi bên trái */
-.user-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(42, 29, 18, 0.7);
-  padding: 4px 14px 4px 6px;
-  border-radius: 40px;
-  border: 1px solid #5c4030;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-}
-.user-badge .home-av {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid #ffe082;
-  background: #2e1a0f;
-  margin: 0;
-  cursor: pointer;
-}
-.user-badge .home-av .ph {
-  font-size: 22px;
-  line-height: 40px;
-}
-.badge-meta {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-.badge-meta .name-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-}
-.badge-meta #homeName {
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #ffe082;
-  background: transparent;
-  border: 0;
-  width: 120px;
-  padding: 0;
-}
-.badge-meta .home-stats {
-  font-size: 0.72rem;
-  color: #cbb894;
-  margin: 0;
-  min-height: auto;
-  text-align: left;
-}
-.btn-logout-icon {
-  background: transparent;
-  border: 0;
-  margin: 0;
-  padding: 0 4px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  opacity: 0.7;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.btn-logout-icon:hover {
-  opacity: 1;
-  transform: scale(1.15);
-  background: transparent;
-}
-
-/* Tựa game ở giữa */
-.brand-center .home-brand {
-  font-size: 1.4rem;
-  letter-spacing: 0.18em;
-  color: #ffe082;
-  font-weight: 900;
-  text-shadow: 0 2px 6px #000, 0 0 12px rgba(255, 224, 130, 0.3);
-  margin: 0;
-  font-family: "Palatino Linotype", "Times New Roman", serif;
-}
-
-/* Cụm công cụ bên phải */
-.top-utilities {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.top-tool-btn {
-  background: #2a1d12;
-  border: 1px solid #5c4030;
-  color: #f3e6c8;
-  font-size: 0.78rem;
-  padding: 6px 12px;
-  border-radius: 20px;
-  margin: 0;
-  transition: all 0.2s ease;
-}
-.top-tool-btn:hover {
-  background: #3e2723;
-  border-color: #ffe082;
-  color: #ffe082;
-}
-.tool-dropdown-wrap {
-  position: relative;
-}
-.tool-dropdown-wrap #onlinePop {
-  position: absolute;
-  top: 38px;
-  right: 0;
-  z-index: 30;
-}
-
-/* Cụm nhạc nền */
-.home-music {
-  display: flex;
-  align-items: center;
-  flex-direction: row-reverse;
-  background: #2a1d12;
-  border: 1px solid #5c4030;
-  border-radius: 20px;
-  padding: 2px 6px;
-  gap: 4px;
-}
-#btnHomeMusic {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  border: 0;
-  margin: 0;
-  padding: 0;
-  font-size: 15px;
-  cursor: pointer;
-}
-#volHome {
-  width: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: width 0.25s ease, opacity 0.2s ease;
-  margin: 0;
-}
-.home-music:hover #volHome,
-.home-music:focus-within #volHome {
-  width: 80px;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* --- 2. KHU VỰC TRUNG TÂM (MAIN STAGE) --- */
-.home-main-stage {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 28px;
-  margin: 18px 0;
-}
-
-/* Tầng 1: Quân cờ */
-.chess-selector-zone {
-  text-align: center;
-}
-.zone-title {
-  font-size: 0.85rem;
-  letter-spacing: 0.15em;
-  color: #c4a574;
-  font-weight: 700;
-  margin-bottom: 12px;
-  text-shadow: 0 1px 2px #000;
-}
-.chess-pieces-duo {
-  display: flex;
-  gap: 36px;
-  justify-content: center;
-}
-.chess-pieces-duo .piece-btn {
-  width: 140px;
-  cursor: pointer;
-  outline: none;
-}
-.chess-pieces-duo .piece-btn .art {
-  width: 124px;
-  height: 124px;
-  border-width: 6px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.7);
-}
-.chess-pieces-duo .piece-btn:hover .art {
-  transform: translateY(-5px) scale(1.04);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 224, 130, 0.4);
-}
-.chess-pieces-duo .piece-btn .piece-lab {
-  font-size: 1.15rem;
-  margin-top: 6px;
-}
-
-/* Tầng 2: 3 Thẻ chức năng đồng bộ */
-.action-trio-zone {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-  width: 100%;
-  max-width: 860px;
-}
-.mode-action-btn {
-  flex: 1 1 240px;
-  max-width: 270px;
-  min-height: 72px;
-  padding: 12px 18px;
-  border-radius: 14px;
-  border: 1.5px solid #c4a574;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  cursor: pointer;
-  text-align: left;
-  margin: 0;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-}
-.mode-action-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.65);
-  filter: brightness(1.12);
-}
-.mode-action-btn:active {
-  transform: translateY(2px);
-}
-.btn-icon {
-  font-size: 26px;
-  line-height: 1;
-}
-.btn-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.btn-main-title {
-  font-size: 1.05rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  line-height: 1.2;
-}
-.btn-sub-title {
-  font-size: 0.72rem;
-  opacity: 0.85;
-  font-weight: 500;
-}
-
-/* 1. Nút Chơi Ngay: Màu Vàng Hoàng Gia */
-.btn-play-quick {
-  background: linear-gradient(135deg, #7a4a0a 0%, #a46d14 50%, #543306 100%);
-  border-color: #ffe082;
-  color: #fffde7;
-}
-.btn-play-quick .btn-main-title {
-  color: #ffe082;
-  text-shadow: 0 2px 4px #000;
-}
-
-/* 2. Nút Khiêu Chiến AI: Màu Ngọc Bích Tu Tiên */
-.btn-play-bot {
-  background: linear-gradient(135deg, #13421d 0%, #1e5c2b 50%, #0d2b13 100%);
-  border-color: #81c784;
-  color: #e8f5e9;
-}
-.btn-play-bot .btn-main-title {
-  color: #a5d6a7;
-  text-shadow: 0 2px 4px #000;
-}
-
-/* 3. Nút Sảnh Bàn Cờ: Màu Gỗ Cổ Điển */
-.btn-play-hall {
-  background: linear-gradient(135deg, #3e2723 0%, #52352f 50%, #2b1814 100%);
-  border-color: #d7ccc8;
-  color: #efebe9;
-}
-.btn-play-hall .btn-main-title {
-  color: #d7ccc8;
-  text-shadow: 0 2px 4px #000;
-}
-
-/* --- 3. DOCK TÌM BẠN DƯỚI CÙNG --- */
-.home-bottom-dock {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-}
-.dock-find-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: rgba(30, 20, 12, 0.8);
-  border: 1px solid #5c4030;
-  border-radius: 30px;
-  padding: 3px 6px 3px 12px;
-  width: min(340px, 92vw);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-.dock-find-icon {
-  font-size: 14px;
-  opacity: 0.7;
-  margin-right: 6px;
-}
-.dock-find-wrap input {
-  background: transparent;
-  border: 0;
-  color: #f3e6c8;
-  font-size: 0.82rem;
-  flex: 1;
-  outline: none;
-}
-.dock-find-wrap input::placeholder {
-  color: #a89274;
-}
-.dock-find-wrap button {
-  background: #5c4030;
-  border: 0;
-  color: #ffe082;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  margin: 0;
-  cursor: pointer;
-}
-.dock-find-wrap button:hover {
-  background: #7a5540;
-}
-.find-dropdown-results {
-  position: absolute;
-  bottom: 42px;
-  left: 0;
-  right: 0;
-  background: #2a1d12;
-  border: 1px solid #5c4030;
-  border-radius: 10px;
-  max-height: 180px;
-  overflow-y: auto;
-  display: none;
-}
-
-/* --- TƯƠNG THÍCH MÀN HÌNH DI ĐỘNG --- */
-@media (max-width: 768px) {
-  #home {
-    padding: 10px 12px 10px;
-    justify-content: flex-start;
-    gap: 16px;
-  }
-  .home-topbar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .brand-center {
-    order: -1;
-    width: 100%;
-    text-align: center;
-  }
-  .brand-center .home-brand {
-    font-size: 1.2rem;
-  }
-  .user-badge {
-    padding: 3px 10px 3px 4px;
-  }
-  .user-badge .home-av {
-    width: 36px;
-    height: 36px;
-  }
-  .badge-meta #homeName {
-    width: 90px;
-    font-size: 0.85rem;
-  }
-  .chess-pieces-duo {
-    gap: 16px;
-  }
-  .chess-pieces-duo .piece-btn {
-    width: 105px;
-  }
-  .chess-pieces-duo .piece-btn .art {
-    width: 92px;
-    height: 92px;
-  }
-  .action-trio-zone {
-    flex-direction: column;
-    width: 100%;
-    gap: 10px;
-  }
-  .mode-action-btn {
-    max-width: 100%;
-    min-height: 58px;
-    padding: 10px 14px;
-  }
-}
-.home-brand-col {
-  position: absolute;
-  top: 14px;
-  left: 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-.home-brand {
-  font-size: 1.05rem;
-  letter-spacing: 0.12em;
-  color: #ffe082;
-  font-weight: 800;
-  text-shadow: 0 2px 0 #3e220c;
-}
-.hub-back {
-  padding: 4px 10px;
-  font-size: 0.78rem;
-  border-radius: 8px;
-  background: #3e2723;
-  color: #ffe082;
-  border: 1px solid #c4a574;
-}
-
-/* Sảnh chọn chế độ (Hub) */
-#hub {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 17;
-  background: radial-gradient(circle at 50% 30%, #6a4a28 0%, #2a1c10 58%, #120c08 100%);
-  color: #f3e6c8;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-#hub.show {
-  display: flex;
-}
-#hub .hub-login {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  width: auto;
-  height: auto;
-  margin: 0;
-  z-index: 2;
-}
-.hub-brand {
-  font-size: 1.45rem;
-  letter-spacing: 0.16em;
-  color: #ffe082;
-  font-weight: 800;
-  text-shadow: 0 2px 0 #3e220c;
-}
-.hub-lead {
-  margin: 8px 0 28px;
-  color: #e6d3a8;
-}
-.hub-row {
-  display: flex;
-  gap: 48px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-/* Nút Quân Cờ 3D trong Hub */
-.piece-btn {
-  width: 210px;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-.piece-btn .art {
-  position: relative;
-  width: 176px;
-  height: 176px;
-  border-radius: 50%;
-  box-shadow: 0 12px 22px #0007, inset 0 6px 10px #fff4;
-  transition: transform 0.2s ease;
-  will-change: transform;
-}
-.piece-btn.tuong .art {
-  background: radial-gradient(circle at 30% 28%, #8fbf7a 0%, #2e5a38 55%, #16321c 100%);
-  border: 7px solid #3e5a32;
-}
-.piece-btn.up .art {
-  background: radial-gradient(circle at 30% 28%, #d47a6a 0%, #7a2a28 58%, #3a1210 100%);
-  border: 7px solid #8b3a2a;
-}
-.piece-btn .disc {
-  position: absolute;
-  width: 78px;
-  height: 78px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 34px;
-  box-shadow: inset 0 4px 6px #fff6, 0 4px 8px #0005;
-}
-.piece-btn .disc.front {
-  right: 22px;
-  top: 28px;
-  background: radial-gradient(circle at 35% 30%, #f6e7c4, #d2a45a 70%, #8a5a18);
-  color: #b71c1c;
-}
-.piece-btn .disc.back {
-  left: 18px;
-  top: 58px;
-  background: radial-gradient(circle at 35% 30%, #f6e7c4, #d2a45a 70%, #8a5a18);
-  color: #111;
-  font-size: 28px;
-}
-.piece-btn .disc.hid {
-  left: 20px;
-  top: 42px;
-  width: 86px;
-  height: 86px;
-  background: radial-gradient(circle at 35% 30%, #8a5a28, #5a3514 70%, #2a1608);
-}
-.piece-btn .disc.small {
-  right: 18px;
-  bottom: 28px;
-  width: 58px;
-  height: 58px;
-  font-size: 22px;
-  top: auto;
-}
-.piece-btn:hover .art {
-  transform: translateY(-3px) scale(1.03);
-}
-.piece-lab {
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #e8c36a;
-  text-shadow: 0 2px 0 #5a3210;
-  font-family: "Palatino Linotype", Palatino, "Times New Roman", serif;
-}
-
-/* Nút Chơi Với Máy (Bot AI) */
-#btnVsBot.btn-vs-bot {
-  width: min(380px, 92vw);
-  margin: 14px auto 0;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #046128 0%, #2b170a 100%);
-  border: 2px solid #e6c27a;
-  box-shadow: 0 6px 0 #180d05, 0 10px 20px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-  cursor: pointer;
-}
-
-#btnVsBot.btn-vs-bot:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 0 #180d05, 0 14px 24px rgba(0, 0, 0, 0.6);
-  border-color: #ffe082;
-}
-
-#btnVsBot.btn-vs-bot:active {
-  transform: translateY(3px);
-  box-shadow: 0 2px 0 #180d05, 0 4px 8px rgba(0, 0, 0, 0.4);
-}
-
-.bot-hero-art {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 6px;
-  position: relative;
-}
-
-.disc-deco {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #f7ecd0, #d2a45a 75%, #8a5a18);
-  border: 2px solid #fff3e0;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 1px #a07238;
-  font-family: "KaiTi", "STKaiti", serif;
-  font-weight: 800;
-  font-size: 22px;
-  line-height: 42px;
-  text-align: center;
-  user-select: none;
-}
-
-.disc-left {
-  color: #c4161c;
-  transform: rotate(-10deg);
-}
-
-.disc-right {
-  color: #1a120b;
-  transform: rotate(10deg);
-}
-
-.bot-thinking {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.bot-face {
-  width: 56px;
-  height: 56px;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
-}
-
-.bot-eye {
-  animation: eyeBlink 2.4s ease-in-out infinite;
-}
-
-@keyframes eyeBlink {
-  0%, 88%, 100% {
-    transform: scale(1);
-    opacity: 1;
-    fill: #80cbc4;
-  }
-  92% {
-    transform: scaleY(0.1);
-    opacity: 0.3;
-  }
-  96% {
-    fill: #ffe082;
-  }
-}
-
-.gear-cog {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  font-size: 16px;
-  color: #ffd54f;
-  animation: gearSpin 4s linear infinite;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
-}
-
-@keyframes gearSpin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.thought-sparkle {
-  position: absolute;
-  top: -12px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  animation: sparklePulse 1.6s ease-in-out infinite alternate;
-}
-
-@keyframes sparklePulse {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.3;
-  }
-  100% {
-    transform: scale(1.1);
-    opacity: 1;
-    filter: drop-shadow(0 0 4px #ffe082);
-  }
-}
-
-.hero-title {
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #ffe082;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
-}
-
-#btnVsBot {
-  width: min(360px, 86vw);
-  margin: 10px auto 0;
-  padding: 14px 12px;
-  border-radius: 18px;
-  background: linear-gradient(#6d4c41, #3e2723);
-  border: 2px solid #ffe082;
-  color: #fff8e7;
-  font-size: 1.05rem;
-}
-
-#btnVsBot .hero-sub {
-  font-size: 0.8rem;
-  color: #ffe082;
-  margin: 4px 0 0;
-  opacity: 0.9;
-}
-
-.home-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 36px;
-  flex-wrap: wrap;
-  width: min(980px, 96vw);
-  padding-top: 56px;
-}
-.home-side {
-  width: 210px;
-  text-align: center;
-  padding-top: 72px;
-}
-.home-center {
-  text-align: center;
-  max-width: 420px;
-}
-.home-av {
-  width: 108px;
-  height: 108px;
-  border-radius: 50%;
-  border: 3px solid #ffe082;
-  background: #3e2723;
-  overflow: hidden;
-  cursor: pointer;
-  padding: 0;
-  margin: 0 auto 8px;
-}
-.home-av img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.home-av .ph {
-  font-size: 48px;
-  line-height: 102px;
-}
-.id-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 8px;
-}
-.id-card .home-av {
-  margin-bottom: 2px;
-}
-.av-actions {
-  min-height: 0;
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-}
-.ghost {
-  background: #3e2723;
-  border: 1px solid #c4a574;
-  color: #ffe082;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-}
-.name-row {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  align-items: center;
-  margin: 0 0 2px;
-}
-#homeName {
-  background: transparent;
-  color: #ffe082;
-  border: 0;
-  border-bottom: 1px dashed transparent;
-  border-radius: 0;
-  padding: 4px 6px;
-  text-align: center;
-  width: 168px;
-  font-weight: 700;
-}
-#homeName:focus,
-#homeName.edit {
-  border-bottom-color: #c4a574;
-  outline: none;
-  background: #2a1d12;
-  border-radius: 8px;
-}
-#homeName.locked {
-  cursor: default;
-  caret-color: transparent;
-}
-.home-stats {
-  font-size: 0.78rem;
-  color: #d7c4a3;
-  line-height: 1.45;
-  text-align: center;
-  margin: 4px 0 6px;
-  min-height: 2.8em;
-}
-.home-side #btnPlayNow {
-  margin-top: 28px;
-}
-#btnPlayNow {
-  width: 132px;
-  height: 132px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #6312ab, #824a02 58%, #802f03);
-  color: #3e220c;
-  font-size: 1.15rem;
-  line-height: 1.15;
-  border: 4px solid #ffe082;
-  box-shadow: 0 8px 0 #1202f4, 0 12px 18px #0006;
-  margin: 0 auto 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(-6deg);
-  transition: transform 0.2s ease;
-  will-change: transform;
-}
-#btnPlayNow:hover {
-  transform: rotate(4deg) scale(1.05);
-}
-
-#btnHero {
-  width: 100%;
-  max-width: 380px;
-  min-height: 168px;
-  background: linear-gradient(#6d3a12, #3e220c);
-  border: 3px solid #e6c27a;
-  border-radius: 18px;
-  font-size: 1.35rem;
-  line-height: 1.25;
-  padding: 12px 10px 16px;
-}
-#btnHero:hover {
-  background: linear-gradient(#8a4a16, #4a280e);
-}
-.hero-art {
-  font-size: 42px;
-  letter-spacing: 6px;
-  margin-bottom: 6px;
-}
-.hero-sub {
-  font-size: 0.82rem;
-  color: #f3e6c8;
-  font-weight: 500;
-  opacity: 0.9;
-}
-#btnStart {
-  background: #2e7d32;
-  display: none;
-}
-
-/* Auth / Popup Forms */
-.pass-row {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  align-items: center;
-  margin: 4px 0;
-}
-#btnEye {
-  padding: 6px 8px;
-  font-size: 0.75rem;
-}
-#authBtns {
-  margin: 8px 0;
-}
-#loginChoice,
-#idBox {
-  display: none;
-  margin: 8px 0 10px;
-}
-#loginChoice.show,
-#idBox.show {
-  display: block;
-}
-#loginChoice button {
-  display: block;
-  width: 220px;
-  margin: 6px auto;
-}
-#idBox input,
-#idBox select {
-  padding: 6px;
-  border-radius: 8px;
-  border: 0;
-  margin: 3px;
-}
-#btnHallHome {
-  min-width: 160px;
-  background: #2e7d32;
-}
-#btnOnline {
-  display: block;
-  margin: 10px auto 0;
-  width: 210px;
-}
-
-#onlinePop {
-  display: none;
-  margin: 8px auto 0;
-  width: 230px;
-  max-height: 260px;
-  overflow: auto;
-  text-align: left;
-  background: #2a1d12;
-  border: 1px solid #5c4030;
-  border-radius: 8px;
-  padding: 6px;
-}
-#onlinePop.show {
-  display: block;
-}
-.online-head {
-  font-size: 0.78rem;
-  color: #ffe082;
-  padding: 4px;
-}
-.on-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  font-size: 0.8rem;
-}
-.on-row button {
-  margin: 0;
-  padding: 3px 7px;
-  font-size: 0.7rem;
-}
-#btnBlockInv.on {
-  background: #8b1e1e;
-  color: #fff8e7;
-}
-#findBox {
-  margin-top: 8px;
-}
-#findBox input {
-  width: 160px;
-  padding: 7px;
-  border-radius: 8px;
-  border: 0;
-}
-#findList {
-  margin-top: 8px;
-  max-height: 220px;
-  overflow: auto;
-  text-align: left;
-}
-.find-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.82rem;
-  margin: 4px 0;
-}
-
-#leavePop,
-#resignPop,
-#authPop,
-#invitePop,
-#profilePop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 22;
-  background: #0008;
-  align-items: center;
-  justify-content: center;
-}
-#profilePop {
-  z-index: 31;
-}
-#authPop {
-  z-index: 23;
-}
-#leavePop.show,
-#resignPop.show,
-#authPop.show,
-#invitePop.show,
-#profilePop.show {
-  display: flex;
-}
-/* =========================================================
-   NÂNG CẤP LOGIN GATE: POPUP KÍNH MỜ XUYÊN THẤU & CHỌN CỜ
-   ========================================================= */
-
-/* Cổng đăng nhập nổi xuyên thấu nhìn thấy Trang Chủ */
-#loginGate {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(15, 10, 6, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  align-items: center;
-  justify-content: center;
-}
-#loginGate.show {
-  display: flex !important;
-}
-
-/* Card đăng nhập nhỏ gọn */
-.login-card {
-  width: min(340px, 92vw);
-  background: rgba(38, 24, 15, 0.85);
-  border: 1px solid #c4a574 !important;
-  border-radius: 16px;
-  padding: 24px 20px;
-  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  text-align: center;
-  margin: 0 auto;
-}
-.login-card h2 {
-  margin: 0 0 4px;
-  color: #ffe082;
-  font-size: 1.4rem;
-  letter-spacing: 0.08em;
-  text-shadow: 0 2px 4px #000;
-}
-.login-sub {
-  color: #d7c4a3;
-  font-size: 0.8rem;
-  margin: 0 0 18px;
-}
-
-/* Cụm 3 nút đăng nhập nhỏ gọn */
-.login-action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.login-btn-item {
-  width: 100%;
-  margin: 0 !important;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-.login-btn-item:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.15);
-}
-.login-btn-item:active {
-  transform: translateY(2px);
-}
-
-.guest-btn {
-  background: linear-gradient(180deg, #4e342e, #2d1c16);
-  color: #ffe082;
-  border-color: #8d6e63;
-}
-.google-btn {
-  background: linear-gradient(180deg, #b71c1c, #7f0000);
-  color: #fff;
-}
-.fb-btn {
-  background: linear-gradient(180deg, #1565c0, #0d47a1);
-  color: #fff;
-}
-.login-btn-icon {
-  font-size: 1rem;
-}
-
-/* =========================================================
-   CỤM NÚT CHỌN CỜ TRỰC TIẾP TẠI TRANG CHỦ
-   ========================================================= */
-.home-modes-wrap {
-  margin: 6px auto 14px;
-  text-align: center;
-}
-.home-modes-wrap .hint {
-  color: #ffe082;
-  font-weight: 700;
-  margin: 0 0 8px;
-  font-size: 0.88rem;
-}
-.home-modes-row {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  align-items: center;
-}
-.home-modes-row .piece-btn {
-  width: 120px;
-  gap: 6px;
-}
-.home-modes-row .piece-btn .art {
-  width: 90px;
-  height: 90px;
-}
-.home-modes-row .piece-btn .disc {
-  width: 44px;
-  height: 44px;
-  font-size: 20px;
-}
-.home-modes-row .piece-btn .disc.front {
-  right: 10px;
-  top: 14px;
-}
-.home-modes-row .piece-btn .disc.back {
-  left: 10px;
-  top: 30px;
-  font-size: 16px;
-}
-.home-modes-row .piece-btn .disc.hid {
-  left: 10px;
-  top: 20px;
-  width: 48px;
-  height: 48px;
-}
-.home-modes-row .piece-btn .disc.small {
-  right: 8px;
-  bottom: 12px;
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
-}
-.home-modes-row .piece-lab {
-  font-size: 1rem;
-}
-
-@media (max-width: 768px) {
-  .home-modes-row {
-    gap: 10px;
-  }
-  .home-modes-row .piece-btn {
-    width: 100px;
-  }
-  .home-modes-row .piece-btn .art {
-    width: 76px;
-    height: 76px;
-  }
-}
-#newProfileName {
-  width: 86%;
-  padding: 8px;
-  border-radius: 8px;
-  border: 0;
-  margin: 8px 0 12px;
-}
-
-/* Sảnh Bàn Chơi (Hall) */
-#hall {
-  background: #160e08;
-  color: #f3e6c8;
-  flex-direction: column;
-  align-items: stretch;
-}
-#hall.show {
-  display: flex;
-}
-#hall .hall-top {
-  padding: 14px 16px 6px;
-  text-align: center;
-}
-#hall .hall-top h2 {
-  margin: 0 0 6px;
-  color: #ffe082;
-}
-#hallStrip {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 24px 20px 40px;
-  cursor: grab;
-  flex: 1;
-  align-items: center;
-  scrollbar-width: thin;
-}
-#hallStrip:active {
-  cursor: grabbing;
-}
-.tbl {
-  min-width: 210px;
-  max-width: 210px;
-  height: 260px;
-  background: #582e0b52;
-  border: 1px solid #5c4030;
-  border-radius: 12px;
-  padding: 12px;
-  flex: 0 0 auto;
-  text-align: center;
-}
-.tbl.mine {
-  border-color: #ffe082;
-}
-.tbl .tid {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #ffe082;
-}
-.tbl .st {
-  margin: 8px 0;
-  font-size: 0.85rem;
-  color: #d7c4a3;
-}
-.tbl button {
-  width: 100%;
-  margin-top: 6px;
-}
-
-/* Vòng tròn Avatar & Đồng hồ */
 .player {
   display: flex;
   flex-direction: column;
@@ -1531,6 +324,39 @@ body:has(#loginGate.show) #gameWrap {
   color: #ff8a80;
   background: #4a1212;
 }
+
+.clock {
+  background: #1a120b;
+  border: 2px solid #5c4030;
+  border-radius: 8px;
+  padding: 2px;
+  text-align: center;
+  width: 100%;
+}
+.clock.active {
+  border-color: #ffe082;
+  box-shadow: 0 0 0 1px #ffe08255;
+}
+.clock.low {
+  border-color: #e53935;
+}
+.clock .who {
+  font-size: 0.68rem;
+  color: #cbb894;
+}
+.clock .game {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.clock .move {
+  display: none;
+}
+.clock.low .game,
+.clock.low .move {
+  color: #ff8a80;
+}
+
 .rank-box {
   font-size: 0.58rem;
   color: #f3e6c8;
@@ -1545,7 +371,7 @@ body:has(#loginGate.show) #gameWrap {
   font-size: 0.7rem;
 }
 
-/* Side Actions & Chat Bar */
+/* Các nút thao tác trong ván */
 .side-actions {
   display: flex;
   flex-direction: column;
@@ -1560,6 +386,13 @@ body:has(#loginGate.show) #gameWrap {
   padding: 0;
   font-size: 0.76rem;
 }
+#btnResign {
+  background: #6d1b1b;
+}
+#btnDraw {
+  background: #4e342e;
+}
+
 .chat-row {
   display: flex;
   align-items: stretch;
@@ -1585,14 +418,10 @@ body:has(#loginGate.show) #gameWrap {
   padding: 0;
   font-size: 0.76rem;
 }
-#btnResign {
-  background: #6d1b1b;
-}
-#btnDraw {
-  background: #4e342e;
-}
 
-/* Left Column & Quân Ăn (Captures) */
+/* =========================================================
+   4. CỘT TRÁI (QUÂN ĂN & CÔNG CỤ)
+   ========================================================= */
 .left-col {
   display: flex;
   flex-direction: column;
@@ -1601,6 +430,7 @@ body:has(#loginGate.show) #gameWrap {
   width: 168px;
   min-width: 168px;
   gap: 6px;
+  overflow: visible;
 }
 .cap-stack {
   display: flex;
@@ -1614,87 +444,6 @@ body:has(#loginGate.show) #gameWrap {
 }
 .left-col.flip .cap-stack {
   flex-direction: column-reverse;
-}
-
-.mid-tools {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  align-self: stretch;
-  gap: 8px;
-  width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.tool-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.spec-box {
-  width: 96px;
-  height: 96px;
-  min-height: 96px;
-  border-radius: 50%;
-  border: 4px solid #81c784;
-  background: #1b5e20;
-  color: #f3e5f5;
-  font-weight: 900;
-  font-size: 1.45rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  line-height: 1.05;
-  padding: 6px;
-  box-shadow: 0 0 12px #66bb6aaa, 0 3px 10px #0006;
-}
-.spec-box .spec-lab {
-  font-size: 0.72rem;
-  color: #f8bbd0;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  margin-top: 1px;
-}
-
-#homeName.guest-name {
-  font-size: 1.7rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: #ffe082;
-}
-.remember {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  color: #d7c4a3;
-  cursor: pointer;
-  user-select: none;
-}
-.remember input {
-  display: none;
-}
-.remember .tick {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  border: 2px solid #c4a574;
-  background: #1a120b;
-  color: transparent;
-  font-weight: 900;
-  text-align: center;
-  line-height: 16px;
-}
-.remember input:checked + .tick {
-  background: #2e7d32;
-  border-color: #81c784;
-  color: #fff;
-  box-shadow: 0 0 8px #81c784aa;
 }
 
 .caps {
@@ -1742,18 +491,74 @@ body:has(#loginGate.show) #gameWrap {
   color: #c4161c;
 }
 
-/* Âm thanh & Popups */
+.mid-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  align-self: stretch;
+  gap: 8px;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: visible;
+}
+.board-tools {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: visible;
+}
+
+.time-wrap {
+  position: relative;
+  z-index: 40;
+  overflow: visible;
+}
+#btnTime {
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+  background: #3e2723;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.time-pop {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 44px;
+  background: #2a1d12;
+  border: 1px solid #5c4030;
+  border-radius: 8px;
+  padding: 6px;
+  z-index: 50;
+  min-width: 120px;
+  pointer-events: auto;
+}
+.time-wrap.open .time-pop {
+  display: block;
+}
+.time-wrap.locked .time-pop {
+  display: none !important;
+}
+.time-pop .mode {
+  display: block;
+  width: 100%;
+  margin: 3px 0;
+  pointer-events: auto;
+}
+.time-pop .mode:disabled {
+  opacity: 0.45;
+}
+
 .sound-wrap {
   position: relative;
 }
-#btnNewLeft {
-  margin: 0;
-  padding: 5px 8px;
-  font-size: 0.72rem;
-  background: #3e2723;
-}
-#btnSpeaker,
-#btnHome {
+#btnSpeaker {
   width: 40px;
   height: 40px;
   margin: 0;
@@ -1788,6 +593,34 @@ body:has(#loginGate.show) #gameWrap {
   vertical-align: middle;
 }
 
+.spec-box {
+  width: 96px;
+  height: 96px;
+  min-height: 96px;
+  border-radius: 50%;
+  border: 4px solid #81c784;
+  background: #1b5e20;
+  color: #f3e5f5;
+  font-weight: 900;
+  font-size: 1.45rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.05;
+  padding: 6px;
+  box-shadow: 0 0 12px #66bb6aaa, 0 3px 10px #0006;
+}
+.spec-box .spec-lab {
+  font-size: 0.72rem;
+  color: #f8bbd0;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  margin-top: 1px;
+}
+
+/* Chat & Nhật ký ván đấu */
 .chat-wrap {
   position: relative;
 }
@@ -1855,7 +688,6 @@ body:has(#loginGate.show) #gameWrap {
   min-width: 240px;
   min-height: 240px;
   height: auto;
-  max-height: none;
   overflow: auto;
   text-align: left;
   background: #1a120b;
@@ -1890,210 +722,811 @@ body:has(#loginGate.show) #gameWrap {
   opacity: 1;
 }
 
-.panel {
+/* =========================================================
+   5. GIAO DIỆN SẢNH CHÍNH (HOME) CỔ TRANG TU TIÊN
+   ========================================================= */
+#home {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 16;
+  background: radial-gradient(circle at 50% 35%, #3d2310 0%, #1a100a 65%, #0d0805 100%);
+  color: #f3e6c8;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 16px 24px 14px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+#home.show {
+  display: flex;
+}
+
+/* Topbar */
+.home-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(196, 165, 116, 0.2);
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(42, 29, 18, 0.7);
+  padding: 4px 14px 4px 6px;
+  border-radius: 40px;
+  border: 1px solid #5c4030;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+.user-badge .home-av {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #ffe082;
+  background: #2e1a0f;
+  margin: 0;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+}
+.user-badge .home-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.user-badge .home-av .ph {
+  font-size: 22px;
+  line-height: 40px;
+  display: block;
+  text-align: center;
+}
+
+.badge-meta {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.badge-meta .name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.badge-meta #homeName {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffe082;
+  background: transparent;
+  border: 0;
+  width: 120px;
+  padding: 0;
+  outline: none;
+}
+.badge-meta #homeName.guest-name {
+  font-size: 1rem;
+  letter-spacing: 1px;
+}
+.badge-meta .home-stats {
+  font-size: 0.72rem;
+  color: #cbb894;
+  margin: 0;
+  min-height: auto;
+  text-align: left;
+}
+
+.btn-logout-icon {
+  background: transparent;
+  border: 0;
+  margin: 0;
+  padding: 0 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.btn-logout-icon:hover {
+  opacity: 1;
+  transform: scale(1.15);
+  background: transparent;
+}
+
+.brand-center .home-brand {
+  font-size: 1.4rem;
+  letter-spacing: 0.18em;
+  color: #ffe082;
+  font-weight: 900;
+  text-shadow: 0 2px 6px #000, 0 0 12px rgba(255, 224, 130, 0.3);
+  margin: 0;
+  font-family: "Palatino Linotype", "Times New Roman", serif;
+}
+
+.top-utilities {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-tool-btn {
+  background: #2a1d12;
+  border: 1px solid #5c4030;
+  color: #f3e6c8;
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  margin: 0;
+  transition: all 0.2s ease;
+}
+.top-tool-btn:hover {
+  background: #3e2723;
+  border-color: #ffe082;
+  color: #ffe082;
+}
+#btnBlockInv.on {
+  background: #8b1e1e;
+  color: #fff8e7;
+}
+
+.tool-dropdown-wrap {
+  position: relative;
+}
+.tool-dropdown-wrap #onlinePop {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  z-index: 30;
+}
+
+.home-music {
+  display: flex;
+  align-items: center;
+  flex-direction: row-reverse;
+  background: #2a1d12;
+  border: 1px solid #5c4030;
+  border-radius: 20px;
+  padding: 2px 6px;
+  gap: 4px;
+}
+#btnHomeMusic {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+  cursor: pointer;
+}
+#volHome {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: width 0.25s ease, opacity 0.2s ease;
+  margin: 0;
+}
+.home-music:hover #volHome,
+.home-music:focus-within #volHome {
+  width: 80px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Khu vực trung tâm sảnh */
+.home-main-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 28px;
+  margin: 18px 0;
+}
+
+.chess-selector-zone {
+  text-align: center;
+}
+.zone-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  color: #c4a574;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-shadow: 0 1px 2px #000;
+}
+.chess-pieces-duo {
+  display: flex;
+  gap: 36px;
+  justify-content: center;
+}
+.chess-pieces-duo .piece-btn {
+  width: 140px;
+  cursor: pointer;
+  outline: none;
+}
+.chess-pieces-duo .piece-btn .art {
+  width: 124px;
+  height: 124px;
+  border-width: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.7);
+}
+.chess-pieces-duo .piece-btn:hover .art {
+  transform: translateY(-5px) scale(1.04);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 224, 130, 0.4);
+}
+.chess-pieces-duo .piece-btn .piece-lab {
+  font-size: 1.15rem;
+  margin-top: 6px;
+}
+
+/* 3 Nút Thao Tác Trận Đấu (Action Trio) */
+.action-trio-zone {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 860px;
+}
+
+.mode-action-btn {
+  flex: 1 1 240px;
+  max-width: 270px;
+  min-height: 108px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1.5px solid #c4a574;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  margin: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  user-select: none;
+}
+.mode-action-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.65);
+  filter: brightness(1.12);
+}
+.mode-action-btn:active {
+  transform: translateY(2px);
+}
+
+.btn-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.btn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.btn-main-title {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+.btn-sub-title {
+  font-size: 0.72rem;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+/* 1. Nút Chơi Ngay */
+.btn-play-quick {
+  background: linear-gradient(135deg, #7a4a0a 0%, #a46d14 50%, #543306 100%);
+  border-color: #ffe082;
+  color: #fffde7;
+}
+.btn-play-quick .btn-main-title {
+  color: #ffe082;
+  text-shadow: 0 2px 4px #000;
+}
+
+/* 2. Nút Khiêu Chiến AI */
+.btn-play-bot {
+  background: linear-gradient(135deg, #13421d 0%, #1e5c2b 50%, #0d2b13 100%);
+  border-color: #81c784;
+  color: #e8f5e9;
+}
+.btn-play-bot .btn-main-title {
+  color: #a5d6a7;
+  text-shadow: 0 2px 4px #000;
+}
+
+/* 3. Nút Sảnh Bàn Cờ */
+.btn-play-hall {
+  background: linear-gradient(135deg, #3e2723 0%, #52352f 50%, #2b1814 100%);
+  border-color: #d7ccc8;
+  color: #efebe9;
+}
+.btn-play-hall .btn-main-title {
+  color: #d7ccc8;
+  text-shadow: 0 2px 4px #000;
+}
+
+.home-bottom-dock {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 20px; /* Thêm dòng này để nâng thanh tìm kiếm lên 20px */
+}
+.dock-find-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(30, 20, 12, 0.8);
+  border: 1px solid #5c4030;
+  border-radius: 30px;
+  padding: 3px 6px 3px 12px;
+  width: min(340px, 92vw);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.dock-find-icon {
+  font-size: 14px;
+  opacity: 0.7;
+  margin-right: 6px;
+}
+.dock-find-wrap input {
+  background: transparent;
+  border: 0;
+  color: #f3e6c8;
+  font-size: 0.82rem;
+  flex: 1;
+  outline: none;
+}
+.dock-find-wrap input::placeholder {
+  color: #a89274;
+}
+.dock-find-wrap button {
+  background: #5c4030;
+  border: 0;
+  color: #ffe082;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  margin: 0;
+  cursor: pointer;
+}
+.dock-find-wrap button:hover {
+  background: #7a5540;
+}
+
+.find-dropdown-results {
+  position: absolute;
+  bottom: 42px;
+  left: 0;
+  right: 0;
   background: #2a1d12;
   border: 1px solid #5c4030;
   border-radius: 10px;
-  padding: 12px 14px;
-  min-width: 250px;
-  max-width: 320px;
+  max-height: 180px;
+  overflow-y: auto;
+  display: none;
 }
-.panel h2 {
-  margin: 0 0 8px;
-  font-size: 1rem;
-}
-
-button {
-  background: #8b4513;
-  color: #fff8e7;
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin: 4px 4px 4px 0;
-  cursor: pointer;
-  font-weight: 600;
-}
-button:hover {
-  background: #a0522d;
-}
-button.secondary {
-  background: #3e2723;
-}
-button.mode {
-  background: #3e2723;
-  min-width: 58px;
-  padding: 7px 8px;
-}
-button.mode.on {
-  background: #2e7d32;
-}
-button.sound.on {
-  background: #1565c0;
-}
-
-.log {
-  height: 140px;
-  overflow: auto;
-  font-size: 0.82rem;
-  background: #1a120b;
-  padding: 8px;
-  border-radius: 6px;
-  line-height: 1.45;
-}
-.board-stage {
-  position: relative;
-  display: inline-block;
-}
-canvas {
-  background: #e8c992;
-  border-radius: 6px;
-  box-shadow: 0 8px 28px #0008;
-  touch-action: none;
+.find-dropdown-results:not(:empty),
+#findList:not(:empty) {
   display: block;
 }
-#timeGate {
-  display: none;
+
+#findList {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow: auto;
+  text-align: left;
+}
+.find-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  margin: 4px 0;
+  padding: 2px 6px;
 }
 
-#drawAsk {
-  position: absolute;
-  inset: 0;
-  background: rgba(18, 10, 6, 0.78);
+#onlinePop {
   display: none;
+  margin: 8px auto 0;
+  width: 230px;
+  max-height: 260px;
+  overflow: auto;
+  text-align: left;
+  background: #2a1d12;
+  border: 1px solid #5c4030;
+  border-radius: 8px;
+  padding: 6px;
+}
+#onlinePop.show {
+  display: block;
+}
+.online-head {
+  font-size: 0.78rem;
+  color: #ffe082;
+  padding: 4px;
+}
+.on-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  font-size: 0.8rem;
+}
+.on-row button {
+  margin: 0;
+  padding: 3px 7px;
+  font-size: 0.7rem;
+}
+
+/* =========================================================
+   6. QUÂN CỜ 3D & TIỆN ÍCH DÙNG CHUNG
+   ========================================================= */
+.piece-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  user-select: none;
+}
+.piece-btn .art {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.44), inset 0 6px 10px rgba(255, 255, 255, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  will-change: transform;
+}
+.piece-btn.tuong .art {
+  background: radial-gradient(circle at 30% 28%, #8fbf7a 0%, #2e5a38 55%, #16321c 100%);
+  border: 7px solid #3e5a32;
+}
+.piece-btn.up .art {
+  background: radial-gradient(circle at 30% 28%, #d47a6a 0%, #7a2a28 58%, #3a1210 100%);
+  border: 7px solid #8b3a2a;
+}
+.piece-btn .disc {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 6;
-  border-radius: 6px;
+  font-weight: 800;
+  font-size: 34px;
+  box-shadow: inset 0 4px 6px rgba(255, 255, 255, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3);
 }
-#drawAsk.show {
-  display: flex;
+.piece-btn .disc.front {
+  right: 22px;
+  top: 28px;
+  background: radial-gradient(circle at 35% 30%, #f6e7c4, #d2a45a 70%, #8a5a18);
+  color: #b71c1c;
 }
-#drawAsk .box {
-  text-align: center;
+.piece-btn .disc.back {
+  left: 18px;
+  top: 58px;
+  background: radial-gradient(circle at 35% 30%, #f6e7c4, #d2a45a 70%, #8a5a18);
+  color: #111;
+  font-size: 28px;
 }
-#drawAsk .box button {
-  min-width: 110px;
+.piece-btn .disc.hid {
+  left: 20px;
+  top: 42px;
+  width: 86px;
+  height: 86px;
+  background: radial-gradient(circle at 35% 30%, #8a5a28, #5a3514 70%, #2a1608);
+}
+.piece-btn .disc.small {
+  right: 18px;
+  bottom: 28px;
+  width: 58px;
+  height: 58px;
+  font-size: 22px;
+  top: auto;
+}
+.piece-btn:hover .art {
+  transform: translateY(-3px) scale(1.03);
+}
+.piece-lab {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #e8c36a;
+  text-shadow: 0 2px 0 #5a3210;
+  font-family: "Palatino Linotype", Palatino, "Times New Roman", serif;
 }
 
-.gate-box {
-  text-align: center;
-  max-width: 320px;
+/* Các cấp độ Bot 3D (Ready Gate) */
+.bot-levels-3d {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
 }
-.gate-box h2 {
-  margin: 0 0 10px;
+.bot-levels-3d.show {
+  display: flex;
+}
+.btn-tier {
+  width: 200px;
+  padding: 10px 16px;
+  font-family: serif;
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  outline: none;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+  position: relative;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 0 #2a1505, 0 6px 10px rgba(0, 0, 0, 0.4);
+}
+.tier-1 { background: linear-gradient(to bottom, #689f38, #33691e); }
+.tier-2 { background: linear-gradient(to bottom, #0288d1, #01579b); }
+.tier-3 { background: linear-gradient(to bottom, #7b1fa2, #4a148c); }
+.tier-4 { background: linear-gradient(to bottom, #f57c00, #e65100); }
+.tier-5 {
+  background: linear-gradient(to bottom, #d32f2f, #b71c1c);
+  box-shadow: 0 4px 0 #4a0000, 0 6px 12px rgba(211, 47, 47, 0.5);
+}
+.btn-tier:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #2a1505, 0 8px 14px rgba(0, 0, 0, 0.5);
+}
+.btn-tier:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #1a0d03, 0 3px 5px rgba(0, 0, 0, 0.3);
+}
+.btn-tier.on {
+  transform: translateY(2px) !important;
+  box-shadow: 0 2px 0 #1a0d03, inset 0 3px 6px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 215, 0, 0.8) !important;
+  border-color: #ffd700 !important;
+  filter: brightness(1.35) saturate(1.2) !important;
+}
+
+/* =========================================================
+   7. POPUP ĐĂNG NHẬP KÍNH MỜ (LOGIN GATE)
+   ========================================================= */
+#loginGate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(15, 10, 6, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+}
+#loginGate.show {
+  display: flex !important;
+}
+
+.login-card {
+  width: min(340px, 92vw);
+  background: rgba(38, 24, 15, 0.85);
+  border: 1px solid #c4a574 !important;
+  border-radius: 16px;
+  padding: 24px 20px;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  text-align: center;
+  margin: 0 auto;
+}
+.login-card h2 {
+  margin: 0 0 4px;
+  color: #ffe082;
+  font-size: 1.4rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 4px #000;
+}
+.login-sub {
+  color: #d7c4a3;
+  font-size: 0.8rem;
+  margin: 0 0 18px;
+}
+
+.login-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.login-btn-item {
+  width: 100%;
+  margin: 0 !important;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.login-btn-item:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+.login-btn-item:active {
+  transform: translateY(2px);
+}
+.guest-btn {
+  background: linear-gradient(180deg, #4e342e, #2d1c16);
+  color: #ffe082;
+  border-color: #8d6e63;
+}
+.google-btn {
+  background: linear-gradient(180deg, #b71c1c, #7f0000);
+  color: #fff;
+}
+.fb-btn {
+  background: linear-gradient(180deg, #1565c0, #0d47a1);
+  color: #fff;
+}
+
+/* =========================================================
+   8. SẢNH CHỜ (HALL) & HUB
+   ========================================================= */
+#hall {
+  display: none;
+  background: #160e08;
+  color: #f3e6c8;
+  flex-direction: column;
+  align-items: stretch;
+}
+#hall.show {
+  display: flex;
+}
+#hall:not(.show) {
+  display: none !important;
+}
+#hall .hall-top {
+  padding: 14px 16px 6px;
+  text-align: center;
+}
+#hall .hall-top h2 {
+  margin: 0 0 6px;
   color: #ffe082;
 }
-.gate-box .modes {
+#hallStrip {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 24px 20px 40px;
+  cursor: grab;
+  flex: 1;
+  align-items: center;
+  scrollbar-width: thin;
 }
-.gate-box .hint {
-  color: #d7c4a3;
-  font-size: 0.82rem;
-  margin: 10px 0 14px;
-  line-height: 1.4;
+#hallStrip:active {
+  cursor: grabbing;
 }
-
-#botLevels {
-  display: none;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-#botLevels.show {
-  display: flex;
-}
-#botLevels button {
-  min-width: 0;
-  min-height: 0;
-  margin: 0;
-  padding: 7px 12px;
-  font-size: 0.82rem;
-  border-radius: 8px;
-  background: #3e2723;
-}
-#botLevels button.on {
-  background: #2e7d32;
-}
-#btnReady {
-  background: #2e7d32;
-  font-size: 1rem;
-  padding: 10px 22px;
-}
-.legend {
-  font-size: 0.78rem;
-  color: #d7c4a3;
-  margin-top: 8px;
-  line-height: 1.45;
-}
-
-/* Đồng hồ bàn cờ */
-.clock {
-  background: #1a120b;
-  border: 2px solid #5c4030;
-  border-radius: 8px;
-  padding: 2px;
+.tbl {
+  min-width: 210px;
+  max-width: 210px;
+  height: 260px;
+  background: rgba(88, 46, 11, 0.32);
+  border: 1px solid #5c4030;
+  border-radius: 12px;
+  padding: 12px;
+  flex: 0 0 auto;
   text-align: center;
-  width: 100%;
 }
-.clock.active {
+.tbl.mine {
   border-color: #ffe082;
-  box-shadow: 0 0 0 1px #ffe08255;
 }
-.clock.low {
-  border-color: #e53935;
-}
-.clock .who {
-  font-size: 0.68rem;
-  color: #cbb894;
-}
-.clock .game {
-  font-size: 1.05rem;
-  font-variant-numeric: tabular-nums;
+.tbl .tid {
+  font-size: 1.2rem;
   font-weight: 800;
+  color: #ffe082;
 }
-.clock .move {
+.tbl .st {
+  margin: 8px 0;
+  font-size: 0.85rem;
+  color: #d7c4a3;
+}
+.tbl button {
+  width: 100%;
+  margin-top: 6px;
+}
+
+#hub {
   display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 17;
+  background: radial-gradient(circle at 50% 30%, #6a4a28 0%, #2a1c10 58%, #120c08 100%);
+  color: #f3e6c8;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
-.clock.low .game,
-.clock.low .move {
-  color: #ff8a80;
-}
-
-.gate-box input {
-  padding: 8px;
-  border-radius: 8px;
-  border: 0;
-  margin: 3px 2px;
-  width: 130px;
-  background: #fff8e7;
-  color: #1a120b;
-}
-#btnPlay {
-  background: #1565c0;
-  font-size: 1rem;
-  padding: 10px 18px;
-}
-.modes {
-  margin-bottom: 6px;
+#hub.show {
+  display: flex;
 }
 
-/* Hồ sơ & Avatar cá nhân */
+/* =========================================================
+   9. POPUPS TIỆN ÍCH (AUTH, PROFILE, LEAVE, RESIGN, OVERLAY)
+   ========================================================= */
+#leavePop,
+#resignPop,
+#authPop,
+#invitePop,
+#profilePop,
 #profPop {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 22;
-  background: #0008;
+  background: rgba(0, 0, 0, 0.55);
   align-items: center;
   justify-content: center;
 }
+#profilePop { z-index: 31; }
+#authPop { z-index: 23; }
+
+#leavePop.show,
+#resignPop.show,
+#authPop.show,
+#invitePop.show,
+#profilePop.show,
 #profPop.show {
   display: flex;
 }
+
+.ov-box {
+  background: #2a1d12;
+  border: 2px solid #c4a574;
+  border-radius: 16px;
+  padding: 24px 28px;
+  text-align: center;
+  min-width: 280px;
+  max-width: 90vw;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.65);
+}
+.ov-box button,
+#readyGate button,
+#drawAsk button,
+#leavePop button,
+#resignPop button,
+#authPop button {
+  min-width: 118px;
+  min-height: 36px;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  margin: 7px 4px;
+  border-radius: 8px;
+}
+
+#newProfileName {
+  width: 86%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 0;
+  margin: 8px 0 12px;
+  outline: none;
+}
+
 .prof-av {
   width: 96px;
   height: 96px;
@@ -2113,11 +1546,11 @@ canvas {
   object-fit: cover;
 }
 
-/* Lớp phủ kết thúc ván đấu */
+/* Lớp phủ kết thúc ván (Overlay) */
 #overlay {
   position: fixed;
   inset: 0;
-  background: #000000cc;
+  background: rgba(0, 0, 0, 0.8);
   display: none;
   align-items: center;
   justify-content: center;
@@ -2126,35 +1559,34 @@ canvas {
 #overlay.show {
   display: flex;
 }
-.ov-box {
-  background: #2a1d12;
-  border: 2px solid #c4a574;
-  border-radius: 16px;
-  padding: 28px 32px;
-  text-align: center;
-  min-width: 280px;
-  box-shadow: 0 16px 50px #000a;
+.ov-title {
+  font-size: 1.4rem;
+  color: #ffe082;
+  margin-bottom: 4px;
 }
-.ov-box button,
-#readyGate button,
-#drawAsk button,
-#leavePop button,
-#resignPop button,
-#authPop button {
-  min-width: 118px;
-  min-height: 36px;
-  padding: 10px 18px;
-  font-size: 0.85rem;
-  margin: 7px 4px;
-  border-radius: 8px;
+.ov-box.mate {
+  border-color: #ff5252;
+  box-shadow: 0 0 30px rgba(255, 23, 68, 0.4);
 }
-#btnReady,
-#btnStart {
-  min-width: 132px;
-  min-height: 39px;
-  font-size: 0.9rem;
-  font-weight: 800;
+.ov-title.mate {
+  animation: mateflash 0.35s ease-in-out 6;
+  will-change: transform, color;
 }
+@keyframes mateflash {
+  from { color: #ffe082; transform: scale(1); }
+  to { color: #ff1744; transform: scale(1.08); }
+}
+.ov-reason {
+  color: #d7c4a3;
+  margin-bottom: 8px;
+}
+.ov-rank {
+  font-size: 0.82rem;
+  color: #ffe082;
+  margin-bottom: 12px;
+  line-height: 1.45;
+}
+
 .faces {
   display: flex;
   gap: 28px;
@@ -2181,148 +1613,60 @@ canvas {
   margin-top: 6px;
   font-weight: 700;
 }
-
 @keyframes bounce {
-  from {
-    transform: translateY(0) scale(1);
-  }
-  to {
-    transform: translateY(-14px) scale(1.08);
-  }
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-14px) scale(1.08); }
 }
 @keyframes sob {
-  from {
-    transform: rotate(-8deg);
-  }
-  to {
-    transform: rotate(8deg) translateY(4px);
-  }
-}
-
-.ov-title {
-  font-size: 1.4rem;
-  color: #ffe082;
-  margin-bottom: 4px;
-}
-.ov-box.mate {
-  border-color: #ff5252;
-  box-shadow: 0 0 30px #ff174466;
-}
-.ov-title.mate {
-  animation: mateflash 0.35s ease-in-out 6;
-  will-change: transform, color;
-}
-@keyframes mateflash {
-  from {
-    color: #ffe082;
-    transform: scale(1);
-  }
-  to {
-    color: #ff1744;
-    transform: scale(1.08);
-  }
-}
-.ov-reason {
-  color: #d7c4a3;
-  margin-bottom: 8px;
-}
-.ov-rank {
-  font-size: 0.82rem;
-  color: #ffe082;
-  margin-bottom: 12px;
-  line-height: 1.45;
-}
-
-/* Nút Bot Cảnh Giới 3D */
-.bot-levels-3d {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  margin: 15px 0;
-}
-.btn-tier {
-  width: 220px;
-  padding: 12px 20px;
-  font-family: serif;
-  font-size: 16px;
-  font-weight: bold;
-  color: #fff;
-  text-align: center;
-  cursor: pointer;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  outline: none;
-  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
-  position: relative;
-  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
-  box-shadow: 0 6px 0 #2a1505, 0 8px 12px rgba(0, 0, 0, 0.4);
-}
-.tier-1 {
-  background: linear-gradient(to bottom, #689f38, #33691e);
-}
-.tier-2 {
-  background: linear-gradient(to bottom, #0288d1, #01579b);
-}
-.tier-3 {
-  background: linear-gradient(to bottom, #7b1fa2, #4a148c);
-}
-.tier-4 {
-  background: linear-gradient(to bottom, #f57c00, #e65100);
-}
-.tier-5 {
-  background: linear-gradient(to bottom, #d32f2f, #b71c1c);
-  box-shadow: 0 6px 0 #4a0000, 0 8px 15px rgba(211, 47, 47, 0.5);
-}
-.btn-tier:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 0 #2a1505, 0 12px 18px rgba(0, 0, 0, 0.5);
-}
-.tier-5:hover {
-  box-shadow: 0 8px 0 #4a0000, 0 12px 20px rgba(255, 69, 0, 0.6);
-}
-.btn-tier:active {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 #1a0d03, 0 4px 6px rgba(0, 0, 0, 0.3);
-  filter: brightness(1.15);
-}
-.btn-tier:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: 0 4px 0 #333, 0 6px 8px rgba(0, 0, 0, 0.2) !important;
-}
-.btn-tier.on {
-  transform: translateY(4px) !important;
-  box-shadow: 0 2px 0 #1a0d03, inset 0 3px 6px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 215, 0, 0.8) !important;
-  border-color: #ffd700 !important;
-  filter: brightness(1.35) saturate(1.2) !important;
-}
-.bot-levels-3d .btn-tier {
-  display: block;
-  opacity: 1;
-  max-height: 60px;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-.bot-levels-3d.collapsed .btn-tier:not(.on) {
-  display: none;
-  opacity: 0;
-  max-height: 0;
-  margin: 0;
-  padding: 0;
-  border: none;
-}
-.bot-levels-3d.collapsed .btn-tier.on::after {
-  content: " ▾";
-  font-size: 14px;
+  from { transform: rotate(-8deg); }
+  to { transform: rotate(8deg) translateY(4px); }
 }
 
 /* =========================================================
-   MEDIA QUERIES (RESPONSIVE)
+   10. BẢO TỒN NÚT CŨ (LEGACY SAFEGUARDS)
    ========================================================= */
+#btnPlayNow:not(.mode-action-btn) {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6312ab, #824a02 58%, #802f03);
+  color: #3e220c;
+  font-size: 1.15rem;
+  line-height: 1.15;
+  border: 4px solid #ffe082;
+  box-shadow: 0 8px 0 #1202f4, 0 12px 18px rgba(0, 0, 0, 0.4);
+  margin: 0 auto 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-6deg);
+  transition: transform 0.2s ease;
+  will-change: transform;
+}
+#btnPlayNow:not(.mode-action-btn):hover {
+  transform: rotate(4deg) scale(1.05);
+}
 
+#btnVsBot:not(.mode-action-btn) {
+  width: min(360px, 86vw);
+  margin: 10px auto 0;
+  padding: 14px 12px;
+  border-radius: 18px;
+  background: linear-gradient(#6d4c41, #3e2723);
+  border: 2px solid #ffe082;
+  color: #fff8e7;
+  font-size: 1.05rem;
+}
+#btnHallHome:not(.mode-action-btn) {
+  min-width: 160px;
+  background: #2e7d32;
+}
+
+/* =========================================================
+   11. TƯƠNG THÍCH ĐA THIẾT BỊ (RESPONSIVE)
+   ========================================================= */
 @media (max-width: 768px) {
+  /* Game Area Mobile */
   #gameWrap.show {
     display: block;
     min-height: 100vh;
@@ -2335,7 +1679,6 @@ canvas {
     padding: 44px 6px 12px;
     width: 100%;
   }
-
   .board-row {
     flex-direction: column;
     align-items: stretch;
@@ -2359,7 +1702,6 @@ canvas {
   .side-clocks {
     display: contents;
   }
-
   .board-stage {
     grid-column: 1 / 5;
     grid-row: 3;
@@ -2373,6 +1715,7 @@ canvas {
     height: auto;
   }
 
+  /* Quân ăn Mobile */
   #capRed {
     position: absolute;
     left: 4px;
@@ -2412,7 +1755,6 @@ canvas {
     line-height: 24px;
   }
 
-  /* Đảo bên khay quân ăn khi lật bàn cờ */
   .left-col.flip #capRed {
     top: auto;
     bottom: 52px;
@@ -2425,6 +1767,8 @@ canvas {
     right: auto;
     left: 4px;
   }
+
+  /* Đồng hồ Mobile */
   .side-clocks .player,
   .side-clocks.flip .player {
     display: flex;
@@ -2438,9 +1782,6 @@ canvas {
     background: #2a1d12;
     border: 1px solid #5c4030;
     border-radius: 8px;
-  }
-  .side-clocks .player .av-wrap {
-    transform: none;
   }
   .side-clocks .player .clock {
     flex: 0 0 35px;
@@ -2462,27 +1803,27 @@ canvas {
     width: 70px;
   }
   .side-clocks > .player:first-of-type {
-    grid-column: 4; 
-    grid-row: 2; 
-    justify-self: end; 
+    grid-column: 4;
+    grid-row: 2;
+    justify-self: end;
     align-self: end;
   }
   .side-clocks > .player:last-of-type {
     grid-column: 1;
-    grid-row: 4; 
-    justify-self: start; 
+    grid-row: 4;
+    justify-self: start;
     align-self: start;
   }
   .side-clocks.flip > .player:first-of-type {
-    grid-column: 1; 
-    grid-row: 4; 
-    justify-self: start; 
+    grid-column: 1;
+    grid-row: 4;
+    justify-self: start;
     align-self: start;
   }
   .side-clocks.flip > .player:last-of-type {
-    grid-column: 4; 
-    grid-row: 2; 
-    justify-self: end; 
+    grid-column: 4;
+    grid-row: 2;
+    justify-self: end;
     align-self: end;
   }
 
@@ -2547,14 +1888,8 @@ canvas {
     font-size: 0.62rem;
     padding: 0 6px;
   }
-  .time-pop {
-    left: auto;
-    right: 0;
-    top: 44px;
-  }
 
   #chatLog {
-    order: 4;
     position: fixed;
     left: 8px;
     right: 8px;
@@ -2581,72 +1916,54 @@ canvas {
     height: 168px;
   }
 
-  .ov-box button,
-  #readyGate button,
-  #drawAsk button,
-  #leavePop button,
-  #resignPop button,
-  #authPop button {
-    min-width: 98px;
-    min-height: 32px;
-    font-size: 0.74rem;
-    padding: 7px 11px;
-  }
-  #home.show {
+  /* Home Mobile */
+  #home {
+    padding: 10px 12px 10px;
     justify-content: flex-start;
-    overflow: auto;
+    gap: 16px;
   }
-  .home-row {
-    flex-direction: column;
-    align-items: center;
+  .home-topbar {
+    flex-wrap: wrap;
     gap: 8px;
+  }
+  .brand-center {
+    order: -1;
     width: 100%;
-    padding: 58px 8px 12px;
+    text-align: center;
   }
-  .home-side {
-    width: min(340px, 94vw);
-    padding-top: 0;
+  .brand-center .home-brand {
+    font-size: 1.2rem;
   }
-  .home-center {
-    max-width: 94vw;
+  .user-badge {
+    padding: 3px 10px 3px 4px;
   }
-  .home-side #btnPlayNow {
-    margin-top: 8px;
+  .user-badge .home-av {
+    width: 36px;
+    height: 36px;
   }
-  #btnPlayNow {
-    width: 88px;
-    height: 88px;
-    font-size: 0.9rem;
+  .badge-meta #homeName {
+    width: 90px;
+    font-size: 0.85rem;
   }
-  #btnVsBot {
-    width: min(340px, 92vw);
-    padding: 8px;
+  .chess-pieces-duo {
+    gap: 16px;
   }
-  #btnVsBot .hero-art {
-    font-size: 22px;
+  .chess-pieces-duo .piece-btn {
+    width: 105px;
   }
-  #findBox input {
-    width: 58%;
+  .chess-pieces-duo .piece-btn .art {
+    width: 92px;
+    height: 92px;
   }
-  #findList {
-    max-height: 88px;
+  .action-trio-zone {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
   }
-  #onlinePop {
-    max-height: 120px;
-  }
-  .home-av {
-    width: 86px;
-    height: 86px;
-  }
-  #hub .hub-row {
-    gap: 20px;
-  }
-  .piece-btn {
-    width: 150px;
-  }
-  .piece-btn .art {
-    width: 128px;
-    height: 128px;
+  .mode-action-btn {
+    max-width: 100%;
+    min-height: 58px;
+    padding: 10px 14px;
   }
 }
 

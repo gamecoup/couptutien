@@ -1,3 +1,4 @@
+/* game.js — Động cơ cờ, AI Minimax, Timer, Âm thanh & Giao diện */
 const COLS = 9, ROWS = 10;
 const NAMES = {K:"Tướng", A:"Sĩ", E:"Tượng", H:"Mã", R:"Xe", C:"Pháo", P:"Tốt"};
 const GLYPH = {
@@ -53,9 +54,48 @@ const domClock = {
 };
 
 let W, H, MARGIN, CELL, pieceFont = "";
+let boardBgCanvas = null; // Canvas nền đệm offscreen
+
 function isMobileUI() {
   return window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
 }
+
+function renderBoardBg() {
+  if (!boardBgCanvas) boardBgCanvas = document.createElement("canvas");
+  boardBgCanvas.width = W;
+  boardBgCanvas.height = H;
+  const bgCtx = boardBgCanvas.getContext("2d");
+  bgCtx.fillStyle = "#e8c992";
+  bgCtx.fillRect(0, 0, W, H);
+  const x0 = MARGIN, y0 = MARGIN;
+  bgCtx.strokeStyle = "#5c3317";
+  bgCtx.lineWidth = 1.4;
+  for (let r = 0; r < ROWS; r++) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(x0, y0 + r * CELL);
+    bgCtx.lineTo(x0 + 8 * CELL, y0 + r * CELL);
+    bgCtx.stroke();
+  }
+  for (let c = 0; c < COLS; c++) {
+    bgCtx.beginPath(); bgCtx.moveTo(x0 + c * CELL, y0); bgCtx.lineTo(x0 + c * CELL, y0 + 4 * CELL); bgCtx.stroke();
+    bgCtx.beginPath(); bgCtx.moveTo(x0 + c * CELL, y0 + 5 * CELL); bgCtx.lineTo(x0 + c * CELL, y0 + 9 * CELL); bgCtx.stroke();
+  }
+  bgCtx.beginPath();
+  bgCtx.moveTo(x0, y0 + 4 * CELL); bgCtx.lineTo(x0, y0 + 5 * CELL);
+  bgCtx.moveTo(x0 + 8 * CELL, y0 + 4 * CELL); bgCtx.lineTo(x0 + 8 * CELL, y0 + 5 * CELL);
+  bgCtx.stroke();
+  bgCtx.beginPath();
+  bgCtx.moveTo(x0 + 3 * CELL, y0); bgCtx.lineTo(x0 + 5 * CELL, y0 + 2 * CELL);
+  bgCtx.moveTo(x0 + 5 * CELL, y0); bgCtx.lineTo(x0 + 3 * CELL, y0 + 2 * CELL);
+  bgCtx.moveTo(x0 + 3 * CELL, y0 + 7 * CELL); bgCtx.lineTo(x0 + 5 * CELL, y0 + 9 * CELL);
+  bgCtx.moveTo(x0 + 5 * CELL, y0 + 7 * CELL); bgCtx.lineTo(x0 + 3 * CELL, y0 + 9 * CELL);
+  bgCtx.stroke();
+  bgCtx.fillStyle = "#8b4513";
+  bgCtx.font = Math.max(12, CELL * 0.22) + "px serif";
+  bgCtx.textAlign = "center"; bgCtx.textBaseline = "middle";
+  bgCtx.fillText("SÔNG", x0 + 4 * CELL, y0 + 4.5 * CELL);
+}
+
 function layout() {
   let maxW;
   if (isMobileUI()) {
@@ -75,6 +115,7 @@ function layout() {
   CELL = (W - 2 * MARGIN) / 8;
   const rad = CELL * 0.407;
   pieceFont = "400 " + (rad * 1.28) + 'px "KaiTi","STKaiti","FangSong","Songti SC",serif';
+  renderBoardBg();
 }
 layout();
 
@@ -155,10 +196,9 @@ function paintHomeProfile() {
   const acc = net.account;
   const me = typeof loadMe === "function" ? loadMe() : {};
   const src = (acc && acc.av) || me.av || "";
-  if (av && src && !src.startsWith("data:,") ) {
+  if (av && src && !src.startsWith("data:,")) {
     const img = new Image();
     img.onload = function () { av.innerHTML = '<img alt="" src="' + src + '">'; };
-    img.onerror = function () {};
     img.src = src;
   }
   if (!acc) {
@@ -174,11 +214,14 @@ function paintHomeProfile() {
     "<br>Tỷ lệ thắng " + wr + "%";
 }
 function paintRanks() {
+  const rRed = document.getElementById("rankRed");
+  const rBlack = document.getElementById("rankBlack");
+  if (!rRed || !rBlack) return;
   const rr = rankFromPts(scores.red);
   const bb = rankFromPts(scores.black);
-  document.getElementById("rankRed").innerHTML =
+  rRed.innerHTML =
     rr.realm + "<div class=\"stars\">" + "★".repeat(rr.star) + "☆".repeat(5 - rr.star) + "</div><div>" + rr.pts + " điểm</div>";
-  document.getElementById("rankBlack").innerHTML =
+  rBlack.innerHTML =
     bb.realm + "<div class=\"stars\">" + "★".repeat(bb.star) + "☆".repeat(5 - bb.star) + "</div><div>" + bb.pts + " điểm</div>";
 }
 function applyScore(winner) {
@@ -361,7 +404,8 @@ function showLobby() {
   started = false;
   moveLock = false;
   resignPending = false;
-  document.getElementById("btnResign").disabled = false;
+  const rBtn = document.getElementById("btnResign");
+  if (rBtn) rBtn.disabled = false;
   setPlayingUI(false);
   stopTick();
   hideOverlay();
@@ -373,9 +417,12 @@ function showLobby() {
   peerReady = false;
   if (typeof updateReadyUI === "function") updateReadyUI();
   if (net.room && net.color) {
-    document.getElementById("netHint").textContent =
-      "Phòng " + net.room + " · bạn cầm " + (net.color === "red" ? "Đỏ" : "Đen") +
-      (net.isHost ? ". Bấm Sẵn sàng cho ván mới." : ". Đợi chủ phòng bắt đầu ván mới.");
+    const nh = document.getElementById("netHint");
+    if (nh) {
+      nh.textContent =
+        "Phòng " + net.room + " · bạn cầm " + (net.color === "red" ? "Đỏ" : "Đen") +
+        (net.isHost ? ". Bấm Sẵn sàng cho ván mới." : ". Đợi chủ phòng bắt đầu ván mới.");
+    }
   }
   setStatus();
   paintClocks();
@@ -397,15 +444,18 @@ function startMatch(fromNet) {
   started = true;
   moveLock = false;
   resignPending = false;
-  document.getElementById("btnResign").disabled = false;
+  const rBtn = document.getElementById("btnResign");
+  if (rBtn) rBtn.disabled = false;
   myReady = false;
   peerReady = false;
   pendingDraw = null;
   drawUsedPly = -1;
   hideDrawAsk();
   hideStartButton();
-  document.getElementById("btnDraw").textContent = "Cầu hòa";
-  document.getElementById("readyGate").classList.remove("show");
+  const dBtn = document.getElementById("btnDraw");
+  if (dBtn) dBtn.textContent = "Cầu hòa";
+  const rGate = document.getElementById("readyGate");
+  if (rGate) rGate.classList.remove("show");
   setPlayingUI(true);
   renderModes();
   paintRanks();
@@ -545,7 +595,6 @@ function rawMoves(board, c, r) {
   return out;
 }
 
-// Tướng chỉ có thể nằm trong cung cấm (c: 3..5, r: 0..2 hoặc 7..9) -> Giảm phạm vi quét từ 90 ô còn 9 ô
 function findKing(board, color) {
   const minR = color === "red" ? 0 : 7;
   const maxR = color === "red" ? 2 : 9;
@@ -566,10 +615,12 @@ function generalsFace(board) {
   return true;
 }
 
-// Tối ưu hóa cực đại: Chỉ slice từng hàng và clone đúng quân cờ di chuyển thay vì clone toàn bộ 90 ô
+// Tối ưu Path-Copying: Chỉ sao chép 2 hàng thay đổi (fromR, toR), tái sử dụng các hàng khác
 function applyMoveBoard(board, mv) {
   const nb = new Array(ROWS);
-  for (let r = 0; r < ROWS; r++) nb[r] = board[r].slice();
+  for (let r = 0; r < ROWS; r++) {
+    nb[r] = (r === mv.fromR || r === mv.toR) ? board[r].slice() : board[r];
+  }
   const p = nb[mv.fromR][mv.fromC];
   nb[mv.fromR][mv.fromC] = null;
   nb[mv.toR][mv.toC] = {
@@ -581,15 +632,31 @@ function applyMoveBoard(board, mv) {
   return nb;
 }
 
+// Bộ lọc tọa độ O(1) kiểm tra khả năng tấn công Tướng để tránh sinh mảng rawMoves thừa
+function canPossiblyAttackKing(p, c, r, kc, kr) {
+  const kind = walkAs(p);
+  const dc = Math.abs(c - kc);
+  const dr = Math.abs(r - kr);
+  if (kind === "P") return (dc + dr === 1);
+  if (kind === "H") return (dc === 1 && dr === 2) || (dc === 2 && dr === 1);
+  if (kind === "R" || kind === "C") return (c === kc || r === kr);
+  if (kind === "A") return (dc === 1 && dr === 1);
+  if (kind === "E") return (dc === 2 && dr === 2);
+  if (kind === "K") return (c === kc);
+  return false;
+}
+
 function attacksKing(board, attackerColor, kingPos) {
+  const kc = kingPos.c, kr = kingPos.r;
   for (let r = 0; r < ROWS; r++) {
     const row = board[r];
     for (let c = 0; c < COLS; c++) {
       const p = row[c];
       if (!p || p.color !== attackerColor) continue;
+      if (!canPossiblyAttackKing(p, c, r, kc, kr)) continue;
       const ms = rawMoves(board, c, r);
       for (let i = 0; i < ms.length; i++) {
-        if (ms[i].c === kingPos.c && ms[i].r === kingPos.r) return true;
+        if (ms[i].c === kc && ms[i].r === kr) return true;
       }
     }
   }
@@ -775,7 +842,7 @@ function stopTick() {
 }
 function onTick(now) {
   tickId = requestAnimationFrame(onTick);
- const isMoving = moveAnim && (now - moveAnim.start < MOVE_SPEED_MS);
+  const isMoving = moveAnim && (now - moveAnim.start < MOVE_SPEED_MS);
   if (!state || (!started && !isMoving) || !clocks) return;
   const dt = now - lastTick;
   lastTick = now;
@@ -794,14 +861,15 @@ function onTick(now) {
   }
   paintClocks();
   const glowing = lastMove && (now - lastMoveTime < LAST_MOVE_GLOW_MS);
-  if (started && !state.over && (inCheck(state.board, state.turn) || glowing)) draw();
+  if (started && !state.over && (inCheck(state.board, state.turn) || glowing || isMoving)) draw();
 }
 
 function finish(winner, reason, fromNet) {
   if (state.over) return;
   cancelBotTimer();
   resignPending = false;
-  document.getElementById("btnResign").disabled = false;
+  const rBtn = document.getElementById("btnResign");
+  if (rBtn) rBtn.disabled = false;
   state.over = true;
   state.winner = winner;
   state.reason = reason;
@@ -865,7 +933,8 @@ function applyMove(mv, fromNet, extra) {
   if (cap) playCaptureSound();
   else playMoveSound();
   if (pendingDraw) cancelDraw(fromNet);
-  document.getElementById("btnDraw").textContent = "Cầu hòa";
+  const dBtn = document.getElementById("btnDraw");
+  if (dBtn) dBtn.textContent = "Cầu hòa";
   state.ply++;
   state.quietPly = cap ? 0 : (state.quietPly || 0) + 1;
   const opp = state.turn === "red" ? "black" : "red";
@@ -1027,9 +1096,7 @@ function botRookOpenFileBonus(board, c) {
   return Math.max(0, 6 - blockers) * 5;
 }
 
-// Tối ưu gộp 1 lượt duyệt duy nhất cho piece val, guard counts và mobility
 function botEvaluate(board, color) {
-  const opp = color === "red" ? "black" : "red";
   let score = 0;
   let myAdvisors = 0, oppAdvisors = 0;
   let myElephants = 0, oppElephants = 0;
@@ -1042,24 +1109,19 @@ function botEvaluate(board, color) {
 
       let v = BOT_PIECE_VAL[p.type] || 0;
 
-      // Thưởng vị trí chiến thuật
       if (p.type === "P") {
         if (crossedRiver(p.color, r)) {
-          v += 120; // Tốt qua sông rất mạnh
-          if (c >= 3 && c <= 5) v += 30; // Tốt áp sát trung lộ
+          v += 120;
+          if (c >= 3 && c <= 5) v += 30;
         }
       } else if (p.type === "H") {
-        // Mã chiếm lộ đẹp, phạt mã nằm ở biên
         v += (c === 0 || c === 8) ? -15 : (4 - Math.abs(c - 4)) * 6;
       } else if (p.type === "C") {
-        // Pháo kiểm soát trung tâm
         v += (4 - Math.abs(c - 4)) * 6;
       } else if (p.type === "R") {
-        // Xe chiếm lộ thông
         v += (4 - Math.abs(c - 4)) * 4 + botRookOpenFileBonus(board, c);
       }
 
-      // Thưởng quân úp tiềm năng
       if (!p.revealed && (p.type === "R" || p.type === "C" || p.type === "H")) {
         v += 20;
       }
@@ -1076,7 +1138,6 @@ function botEvaluate(board, color) {
     }
   }
 
-  // Thưởng giữ cặp Sĩ - Tượng phòng thủ
   score += (myAdvisors - oppAdvisors) * 25 + (myElephants - oppElephants) * 20;
   if (myAdvisors === 2) score += 15;
   if (myElephants === 2) score += 15;
@@ -1086,18 +1147,15 @@ function botEvaluate(board, color) {
 
 function botMoveKey(m) { return m.fromC + "," + m.fromR + ">" + m.toC + "," + m.toR; }
 
-// Tính trước điểm move score (Schwartzian transform) để sort không gọi botMoveScore N*logN lần
+// Sắp xếp nước đi in-place, không cấp phát mảng phụ
 function botOrderMoves(board, moves, ttMove, depth) {
   const ttKey = ttMove ? botMoveKey(ttMove) : null;
   const killers = (botKillers && botKillers[depth]) || null;
-  const scored = new Array(moves.length);
   for (let i = 0; i < moves.length; i++) {
-    scored[i] = { move: moves[i], score: botMoveScore(board, moves[i], ttKey, killers) };
+    moves[i]._score = botMoveScore(board, moves[i], ttKey, killers);
   }
-  scored.sort((a, b) => b.score - a.score);
-  const out = new Array(moves.length);
-  for (let i = 0; i < moves.length; i++) out[i] = scored[i].move;
-  return out;
+  moves.sort((a, b) => b._score - a._score);
+  return moves;
 }
 function botMoveScore(board, m, ttKey, killers) {
   const key = botMoveKey(m);
@@ -1148,7 +1206,6 @@ function botNegamax(board, depth, alpha, beta, color, ply) {
   if (!findKing(board, color)) return -9000 + ply;
   if (!findKing(board, opp)) return 9000 - ply;
   
-  // Tối ưu TT: Bỏ "#depth" khỏi key để tái sử dụng ttMove và cutoff từ độ sâu thấp hơn
   const key = boardKey(board, color);
   const tt = botTT.get(key);
   let ttMove = null;
@@ -1257,7 +1314,6 @@ function botPlay() {
   const pick = botChooseMove(state.board, color, state.captured, Object.assign({}, level, {timeMs: timeMs}));
   const thinkTime = performance.now() - t0;
 
-  // Trừ trực tiếp thời gian Bot vừa dùng để suy nghĩ vào đồng hồ ván của Bot
   if (clocks && clocks[color]) {
     clocks[color] = Math.max(0, clocks[color] - thinkTime);
   }
@@ -1536,10 +1592,7 @@ function viewC(c) { return boardFlipped() ? 8 - c : c; }
 function viewR(r) { return boardFlipped() ? 9 - r : r; }
 
 function applyViewLayout() {
-  // Khi bạn cầm Đỏ: lật ghế (Đỏ xuống dưới, Đen lên trên) khớp với bàn cờ ở dưới.
-  // Khi bạn cầm Đen: giữ nguyên mặc định (Đen đã ở sẵn phía dưới).
   const shouldFlip = !!(net && net.color === "red");
-
   const sc = document.querySelector(".side-clocks");
   if (sc) sc.classList.toggle("flip", shouldFlip);
   const lc = document.querySelector(".left-col");
@@ -1595,37 +1648,12 @@ canvas.addEventListener("pointerdown", ev => {
     selected = null; hints = []; setStatus(); draw();
   }
 });
+
 function drawBoard() {
-  ctx.fillStyle = "#e8c992";
-  ctx.fillRect(0, 0, W, H);
-  const x0 = MARGIN, y0 = MARGIN;
-  ctx.strokeStyle = "#5c3317";
-  ctx.lineWidth = 1.4;
-  for (let r = 0; r < ROWS; r++) {
-    ctx.beginPath();
-    ctx.moveTo(x0, y0 + r * CELL);
-    ctx.lineTo(x0 + 8 * CELL, y0 + r * CELL);
-    ctx.stroke();
-  }
-  for (let c = 0; c < COLS; c++) {
-    ctx.beginPath(); ctx.moveTo(x0 + c * CELL, y0); ctx.lineTo(x0 + c * CELL, y0 + 4 * CELL); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x0 + c * CELL, y0 + 5 * CELL); ctx.lineTo(x0 + c * CELL, y0 + 9 * CELL); ctx.stroke();
-  }
-  ctx.beginPath();
-  ctx.moveTo(x0, y0 + 4 * CELL); ctx.lineTo(x0, y0 + 5 * CELL);
-  ctx.moveTo(x0 + 8 * CELL, y0 + 4 * CELL); ctx.lineTo(x0 + 8 * CELL, y0 + 5 * CELL);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x0 + 3 * CELL, y0); ctx.lineTo(x0 + 5 * CELL, y0 + 2 * CELL);
-  ctx.moveTo(x0 + 5 * CELL, y0); ctx.lineTo(x0 + 3 * CELL, y0 + 2 * CELL);
-  ctx.moveTo(x0 + 3 * CELL, y0 + 7 * CELL); ctx.lineTo(x0 + 5 * CELL, y0 + 9 * CELL);
-  ctx.moveTo(x0 + 5 * CELL, y0 + 7 * CELL); ctx.lineTo(x0 + 3 * CELL, y0 + 9 * CELL);
-  ctx.stroke();
-  ctx.fillStyle = "#8b4513";
-  ctx.font = Math.max(12, CELL * 0.22) + "px serif";
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("SÔNG", x0 + 4 * CELL, y0 + 4.5 * CELL);
+  if (!boardBgCanvas) renderBoardBg();
+  ctx.drawImage(boardBgCanvas, 0, 0);
 }
+
 function drawPiece(p, c, r, checkedKing) {
   const x = MARGIN + viewC(c) * CELL, y = MARGIN + viewR(r) * CELL, rad = CELL * 0.407;
   const isCheckKing = checkedKing && p.type === "K" && p.color === checkedKing;
@@ -1663,6 +1691,7 @@ function drawPiece(p, c, r, checkedKing) {
     ctx.fillText(ch, x, y + 0.4);
   }
 }
+
 function draw() {
   if (!state) return;
   drawBoard();
@@ -1690,7 +1719,6 @@ function draw() {
     const row = state.board[r];
     for (let c = 0; c < COLS; c++) {
       if (row[c]) {
-        // Ô đích của quân đang trượt sẽ không vẽ tĩnh cho đến khi trượt xong
         if (isMoving && c === moveAnim.toC && r === moveAnim.toR) continue;
         drawPiece(row[c], c, r, checkedKing);
       }
@@ -1700,7 +1728,7 @@ function draw() {
   // 2. Vẽ quân cờ đang lướt mượt mà giữa 2 ô
   if (isMoving) {
     const progress = Math.min(1, (now - moveAnim.start) / MOVE_SPEED_MS);
-    const ease = 1 - Math.pow(1 - progress, 3); // Giảm tốc êm dịu khi tới đích
+    const ease = 1 - Math.pow(1 - progress, 3);
     const startX = MARGIN + viewC(moveAnim.fromC) * CELL;
     const startY = MARGIN + viewR(moveAnim.fromR) * CELL;
     const endX = MARGIN + viewC(moveAnim.toC) * CELL;
@@ -1729,9 +1757,11 @@ function draw() {
     ctx.restore();
   }
 }
+
 function paintCaptures() {
   function fill(id, list, owner) {
     const box = document.getElementById(id);
+    if (!box) return;
     box.innerHTML = "";
     const mine = net.color === owner;
     (list || []).forEach(function (p) {
@@ -1748,43 +1778,64 @@ function paintCaptures() {
   fill("capRed", state.captured.red, "red");
   fill("capBlack", state.captured.black, "black");
 }
+
 function refreshSoundButtons() {
   const sp = document.getElementById("btnSpeaker");
-  document.getElementById("chkMusic").checked = musicOn;
-  document.getElementById("chkSfx").checked = sfxOn;
+  const cMusic = document.getElementById("chkMusic");
+  const cSfx = document.getElementById("chkSfx");
+  if (cMusic) cMusic.checked = musicOn;
+  if (cSfx) cSfx.checked = sfxOn;
   const vm = document.getElementById("volMusic");
   const vs = document.getElementById("volSfx");
   if (vm) vm.value = Math.round(musicVol * 100);
   if (vs) vs.value = Math.round(sfxVol * 100);
-  sp.textContent = (musicOn || sfxOn) ? "🔊" : "🔇";
+  if (sp) sp.textContent = (musicOn || sfxOn) ? "🔊" : "🔇";
 }
-document.getElementById("btnSpeaker").onclick = function (ev) {
-  ev.stopPropagation();
-  document.getElementById("soundWrap").classList.toggle("open");
-  document.getElementById("chatWrap").classList.remove("open");
-};
-document.getElementById("chkMusic").onchange = function () {
-  musicOn = this.checked;
-  saveAudioPref();
-  refreshSoundButtons();
-  if (musicOn) startMusic();
-  else stopMusic();
-};
-document.getElementById("chkSfx").onchange = function () {
-  sfxOn = this.checked;
-  saveAudioPref();
-  refreshSoundButtons();
-};
-document.getElementById("volMusic").oninput = function () {
-  musicVol = Math.max(0, Math.min(1, (this.value | 0) / 100));
-  var el = document.getElementById("audGame");
-  if (el) el.volume = musicVol;
-  saveAudioPref();
-};
-document.getElementById("volSfx").oninput = function () {
-  sfxVol = Math.max(0, Math.min(1, (this.value | 0) / 100));
-  saveAudioPref();
-};
+
+const btnSpeaker = document.getElementById("btnSpeaker");
+if (btnSpeaker) {
+  btnSpeaker.onclick = function (ev) {
+    ev.stopPropagation();
+    const sw = document.getElementById("soundWrap");
+    if (sw) sw.classList.toggle("open");
+    const cw = document.getElementById("chatWrap");
+    if (cw) cw.classList.remove("open");
+  };
+}
+const chkMusic = document.getElementById("chkMusic");
+if (chkMusic) {
+  chkMusic.onchange = function () {
+    musicOn = this.checked;
+    saveAudioPref();
+    refreshSoundButtons();
+    if (musicOn) startMusic();
+    else stopMusic();
+  };
+}
+const chkSfx = document.getElementById("chkSfx");
+if (chkSfx) {
+  chkSfx.onchange = function () {
+    sfxOn = this.checked;
+    saveAudioPref();
+    refreshSoundButtons();
+  };
+}
+const volMusic = document.getElementById("volMusic");
+if (volMusic) {
+  volMusic.oninput = function () {
+    musicVol = Math.max(0, Math.min(1, (this.value | 0) / 100));
+    const el = document.getElementById("audGame");
+    if (el) el.volume = musicVol;
+    saveAudioPref();
+  };
+}
+const volSfx = document.getElementById("volSfx");
+if (volSfx) {
+  volSfx.oninput = function () {
+    sfxVol = Math.max(0, Math.min(1, (this.value | 0) / 100));
+    saveAudioPref();
+  };
+}
 
 const EMO = ["😄","😂","😎","😮","😡","😭","👍","👏","🔥","🐔","❤️","🤝"];
 let chatHideTimer = 0;
@@ -1801,10 +1852,12 @@ function clearChatLog() {
 function showChat(who, txt) {
   addLog(who + ": " + txt);
   const toast = document.getElementById("chatToast");
-  toast.textContent = who + " " + txt;
-  toast.classList.add("show");
-  clearTimeout(chatHideTimer);
-  chatHideTimer = setTimeout(function () { toast.classList.remove("show"); }, 8000);
+  if (toast) {
+    toast.textContent = who + " " + txt;
+    toast.classList.add("show");
+    clearTimeout(chatHideTimer);
+    chatHideTimer = setTimeout(function () { toast.classList.remove("show"); }, 8000);
+  }
   const log = document.getElementById("chatLog");
   if (log) {
     const line = document.createElement("div");
@@ -1826,8 +1879,10 @@ function showChat(who, txt) {
 function sendChat(txt) {
   txt = String(txt || "").trim();
   if (!txt) return;
-  document.getElementById("chatWrap").classList.remove("open");
-  document.getElementById("quickWrap").classList.remove("open");
+  const cw = document.getElementById("chatWrap");
+  const qw = document.getElementById("quickWrap");
+  if (cw) cw.classList.remove("open");
+  if (qw) qw.classList.remove("open");
   if (net.online && !net.vsBot) {
     relay({kind:"chat", text: txt});
     return;
@@ -1837,6 +1892,7 @@ function sendChat(txt) {
 }
 (function buildQuickChat() {
   const box = document.getElementById("quickPop");
+  if (!box) return;
   QUICK.forEach(function (txt) {
     const b = document.createElement("button");
     b.textContent = txt;
@@ -1850,36 +1906,64 @@ function sendChat(txt) {
     box.appendChild(b);
   });
 })();
-document.getElementById("btnChat").onclick = function (ev) {
-  ev.stopPropagation();
-  document.getElementById("chatWrap").classList.toggle("open");
-  document.getElementById("quickWrap").classList.remove("open");
-  document.getElementById("soundWrap").classList.remove("open");
-  const t = document.getElementById("chatText");
-  if (t) setTimeout(function () { t.focus(); }, 0);
-};
-document.getElementById("btnQuick").onclick = function (ev) {
-  ev.stopPropagation();
-  document.getElementById("quickWrap").classList.toggle("open");
-  document.getElementById("chatWrap").classList.remove("open");
-};
-document.getElementById("btnChatSend").onclick = function (ev) {
-  ev.stopPropagation();
-  sendChat(document.getElementById("chatText").value);
-  document.getElementById("chatText").value = "";
-};
-document.getElementById("chatText").addEventListener("keydown", function (e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    document.getElementById("btnChatSend").click();
-  }
-});
-document.getElementById("chatPop").addEventListener("click", function (e) { e.stopPropagation(); });
-document.getElementById("quickPop").addEventListener("click", function (e) { e.stopPropagation(); });
+
+const btnChat = document.getElementById("btnChat");
+if (btnChat) {
+  btnChat.onclick = function (ev) {
+    ev.stopPropagation();
+    const cw = document.getElementById("chatWrap");
+    if (cw) cw.classList.toggle("open");
+    const qw = document.getElementById("quickWrap");
+    if (qw) qw.classList.remove("open");
+    const sw = document.getElementById("soundWrap");
+    if (sw) sw.classList.remove("open");
+    const t = document.getElementById("chatText");
+    if (t) setTimeout(function () { t.focus(); }, 0);
+  };
+}
+const btnQuick = document.getElementById("btnQuick");
+if (btnQuick) {
+  btnQuick.onclick = function (ev) {
+    ev.stopPropagation();
+    const qw = document.getElementById("quickWrap");
+    if (qw) qw.classList.toggle("open");
+    const cw = document.getElementById("chatWrap");
+    if (cw) cw.classList.remove("open");
+  };
+}
+const btnChatSend = document.getElementById("btnChatSend");
+if (btnChatSend) {
+  btnChatSend.onclick = function (ev) {
+    ev.stopPropagation();
+    const t = document.getElementById("chatText");
+    if (t) {
+      sendChat(t.value);
+      t.value = "";
+    }
+  };
+}
+const chatText = document.getElementById("chatText");
+if (chatText) {
+  chatText.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const sendBtn = document.getElementById("btnChatSend");
+      if (sendBtn) sendBtn.click();
+    }
+  });
+}
+const chatPop = document.getElementById("chatPop");
+if (chatPop) chatPop.addEventListener("click", function (e) { e.stopPropagation(); });
+const quickPop = document.getElementById("quickPop");
+if (quickPop) quickPop.addEventListener("click", function (e) { e.stopPropagation(); });
+
 document.addEventListener("click", function () {
-  document.getElementById("chatWrap").classList.remove("open");
-  document.getElementById("quickWrap").classList.remove("open");
-  document.getElementById("soundWrap").classList.remove("open");
+  const cw = document.getElementById("chatWrap");
+  if (cw) cw.classList.remove("open");
+  const qw = document.getElementById("quickWrap");
+  if (qw) qw.classList.remove("open");
+  const sw = document.getElementById("soundWrap");
+  if (sw) sw.classList.remove("open");
 });
 
 function hideDrawAsk() {
@@ -1887,7 +1971,8 @@ function hideDrawAsk() {
   if (el) el.classList.remove("show");
 }
 function showDrawAsk() {
-  document.getElementById("drawAsk").classList.add("show");
+  const el = document.getElementById("drawAsk");
+  if (el) el.classList.add("show");
 }
 function myTurnNow() {
   if (!state || state.over) return false;
@@ -1902,7 +1987,8 @@ function offerDraw() {
   pendingDraw = net.color || state.turn;
   drawUsedPly = state.ply;
   addLog((pendingDraw === "red" ? "Đỏ" : "Đen") + " cầu hòa. Chờ đối thủ...");
-  document.getElementById("btnDraw").textContent = "Đang chờ hòa";
+  const dBtn = document.getElementById("btnDraw");
+  if (dBtn) dBtn.textContent = "Đang chờ hòa";
   relay({kind:"draw-ask", from: pendingDraw});
 }
 function onDrawAsked(from) {
@@ -1913,51 +1999,75 @@ function onDrawAsked(from) {
 function acceptDraw(fromNet) {
   if (!pendingDraw && !fromNet) return;
   hideDrawAsk();
-  document.getElementById("btnDraw").textContent = "Cầu hòa";
+  const dBtn = document.getElementById("btnDraw");
+  if (dBtn) dBtn.textContent = "Cầu hòa";
   if (!fromNet) relay({kind:"draw-yes"});
   finish("draw", "Hòa nhau rồi", fromNet);
 }
 function declineDraw(fromNet) {
   hideDrawAsk();
   pendingDraw = null;
-  document.getElementById("btnDraw").textContent = "Cầu hòa";
+  const dBtn = document.getElementById("btnDraw");
+  if (dBtn) dBtn.textContent = "Cầu hòa";
   addLog("Từ chối hòa. Ván tiếp tục.");
   if (!fromNet) relay({kind:"draw-no"});
 }
 function cancelDraw(fromNet) {
   hideDrawAsk();
   pendingDraw = null;
-  document.getElementById("btnDraw").textContent = "Cầu hòa";
+  const dBtn = document.getElementById("btnDraw");
+  if (dBtn) dBtn.textContent = "Cầu hòa";
   if (!fromNet) relay({kind:"draw-cancel"});
 }
-document.getElementById("btnDraw").onclick = function () {
-  if (net.spectate) return;
-  offerDraw();
-};
-document.getElementById("btnDrawYes").onclick = function () { acceptDraw(false); };
-document.getElementById("btnDrawNo").onclick = function () { declineDraw(false); };
-document.getElementById("btnResign").onclick = function () {
-  if (net.spectate) return;
-  if (!started || !state || state.over) return;
-  if (resignPending) return;
-  document.getElementById("resignPop").classList.add("show");
-};
-document.getElementById("btnResignNo").onclick = function () {
-  document.getElementById("resignPop").classList.remove("show");
-};
-document.getElementById("btnResignYes").onclick = function () {
-  document.getElementById("resignPop").classList.remove("show");
-  if (!started || !state || state.over || resignPending) return;
-  const loser = net.color || state.turn;
-  if (net.online && !net.vsBot) {
-    resignPending = true;
-    document.getElementById("btnResign").disabled = true;
-    document.getElementById("netHint").textContent = "Đang gửi yêu cầu xin thua...";
-    safeNetSend({type:"resign"});
-    return;
-  }
-  finish(loser === "red" ? "black" : "red", (loser === "red" ? "Đỏ" : "Đen") + " xin thua");
-};
+
+const btnDraw = document.getElementById("btnDraw");
+if (btnDraw) {
+  btnDraw.onclick = function () {
+    if (net.spectate) return;
+    offerDraw();
+  };
+}
+const btnDrawYes = document.getElementById("btnDrawYes");
+if (btnDrawYes) btnDrawYes.onclick = function () { acceptDraw(false); };
+const btnDrawNo = document.getElementById("btnDrawNo");
+if (btnDrawNo) btnDrawNo.onclick = function () { declineDraw(false); };
+
+const btnResign = document.getElementById("btnResign");
+if (btnResign) {
+  btnResign.onclick = function () {
+    if (net.spectate) return;
+    if (!started || !state || state.over) return;
+    if (resignPending) return;
+    const pop = document.getElementById("resignPop");
+    if (pop) pop.classList.add("show");
+  };
+}
+const btnResignNo = document.getElementById("btnResignNo");
+if (btnResignNo) {
+  btnResignNo.onclick = function () {
+    const pop = document.getElementById("resignPop");
+    if (pop) pop.classList.remove("show");
+  };
+}
+const btnResignYes = document.getElementById("btnResignYes");
+if (btnResignYes) {
+  btnResignYes.onclick = function () {
+    const pop = document.getElementById("resignPop");
+    if (pop) pop.classList.remove("show");
+    if (!started || !state || state.over || resignPending) return;
+    const loser = net.color || state.turn;
+    if (net.online && !net.vsBot) {
+      resignPending = true;
+      const rBtn = document.getElementById("btnResign");
+      if (rBtn) rBtn.disabled = true;
+      const nh = document.getElementById("netHint");
+      if (nh) nh.textContent = "Đang gửi yêu cầu xin thua...";
+      safeNetSend({type:"resign"});
+      return;
+    }
+    finish(loser === "red" ? "black" : "red", (loser === "red" ? "Đỏ" : "Đen") + " xin thua");
+  };
+}
 
 function updateReadyUI() {
   const gate = document.getElementById("readyGate");
@@ -1965,6 +2075,8 @@ function updateReadyUI() {
   const start = document.getElementById("btnStart");
   const hint = document.getElementById("waitHint");
   const botBox = document.getElementById("botLevels");
+  if (!gate || !btn || !start || !hint) return;
+
   if (isBotTable()) {
     if (gameInPlay()) {
       gate.classList.remove("show");
@@ -2016,14 +2128,19 @@ function updateReadyUI() {
   }
   renderModes();
 }
-document.getElementById("btnReady").onclick = function () {
-  if (started && state && !state.over) return;
-  if (!net.color) { addLog("Chờ đối thủ vào bàn."); return; }
-  myReady = !myReady;
-  if (myReady && net.isHost) safeNetSend({ type: "time", timeId: timeMode.id });
-  safeNetSend({ type: "ready", on: myReady });
-  updateReadyUI();
-};
+
+const btnReady = document.getElementById("btnReady");
+if (btnReady) {
+  btnReady.onclick = function () {
+    if (started && state && !state.over) return;
+    if (!net.color) { addLog("Chờ đối thủ vào bàn."); return; }
+    myReady = !myReady;
+    if (myReady && net.isHost) safeNetSend({ type: "time", timeId: timeMode.id });
+    safeNetSend({ type: "ready", on: myReady });
+    updateReadyUI();
+  };
+}
+
 function renderBotLevels() {
   const box = document.getElementById("botLevels");
   if (!box) return;
@@ -2044,39 +2161,55 @@ if (botLevelsContainer) {
   };
 }
 
-document.getElementById("btnStart").onclick = function () {
-  hideStartButton();
-  if (isBotTable()) {
-    startMatch(false);
-    return;
-  }
-  if (!net.isHost || !myReady || !peerReady) {
-    if (typeof updateReadyUI === "function") updateReadyUI();
-    return;
-  }
-  safeNetSend({ type: "begin" });
-};
-document.getElementById("btnTime").onclick = function (ev) {
-  ev.preventDefault();
-  ev.stopPropagation();
-  const timeWrap = document.getElementById("timeWrap");
-  if (!canEditTime()) {
-    timeWrap.classList.remove("open");
-    addLog(gameInPlay() ? "Đang trong ván, không đổi giờ." : "Hiện chưa đổi được giờ.");
-    return;
-  }
-  timeWrap.classList.toggle("open");
-  document.getElementById("soundWrap").classList.remove("open");
-  document.getElementById("chatWrap").classList.remove("open");
-  document.getElementById("quickWrap").classList.remove("open");
-};
-document.getElementById("modes").addEventListener("click", function (ev) {
-  ev.stopPropagation();
-});
+const btnStart = document.getElementById("btnStart");
+if (btnStart) {
+  btnStart.onclick = function () {
+    hideStartButton();
+    if (isBotTable()) {
+      startMatch(false);
+      return;
+    }
+    if (!net.isHost || !myReady || !peerReady) {
+      if (typeof updateReadyUI === "function") updateReadyUI();
+      return;
+    }
+    safeNetSend({ type: "begin" });
+  };
+}
+
+const btnTime = document.getElementById("btnTime");
+if (btnTime) {
+  btnTime.onclick = function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const timeWrap = document.getElementById("timeWrap");
+    if (!timeWrap) return;
+    if (!canEditTime()) {
+      timeWrap.classList.remove("open");
+      addLog(gameInPlay() ? "Đang trong ván, không đổi giờ." : "Hiện chưa đổi được giờ.");
+      return;
+    }
+    timeWrap.classList.toggle("open");
+    const sw = document.getElementById("soundWrap");
+    if (sw) sw.classList.remove("open");
+    const cw = document.getElementById("chatWrap");
+    if (cw) cw.classList.remove("open");
+    const qw = document.getElementById("quickWrap");
+    if (qw) qw.classList.remove("open");
+  };
+}
+
+const modesBox = document.getElementById("modes");
+if (modesBox) {
+  modesBox.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+  });
+}
 document.addEventListener("click", function (ev) {
   const tw = document.getElementById("timeWrap");
   if (tw && !ev.target.closest("#timeWrap")) tw.classList.remove("open");
 });
+
 function backToRoom() {
   if (started && state && !state.over) return;
   showLobby();
@@ -2208,47 +2341,67 @@ function openProfile(color) {
   const games = st.games || 0;
   const wr = games ? Math.round(1000 * (st.wins || 0) / games) / 10 : 0;
   const rk = rankFromPts(mine ? (net.account ? scores[color] : 0) : (p.pts || 0));
-  document.getElementById("profName").textContent = name;
+  const pName = document.getElementById("profName");
+  if (pName) pName.textContent = name;
   const av = document.getElementById("profAv");
   const src = mine ? (ownAvatarSrc() || p.av) : p.av;
-  av.innerHTML = src ? '<img alt="" src="' + src + '">' : (color === "red" ? "🔴" : "⚫");
-  document.getElementById("profStats").innerHTML =
-    "Cấp: " + rk.realm + " " + "★".repeat(rk.star) +
-    "<br>Thắng: " + wr + "% · " + games + " ván (" + (st.wins||0) + " thắng)";
+  if (av) av.innerHTML = src ? '<img alt="" src="' + src + '">' : (color === "red" ? "🔴" : "⚫");
+  const pStats = document.getElementById("profStats");
+  if (pStats) {
+    pStats.innerHTML =
+      "Cấp: " + rk.realm + " " + "★".repeat(rk.star) +
+      "<br>Thắng: " + wr + "% · " + games + " ván (" + (st.wins||0) + " thắng)";
+  }
   const up = document.getElementById("btnProfUpload");
   const save = document.getElementById("btnProfSave");
-  up.style.display = "none";
-  save.style.display = "none";
-  save.disabled = true;
-  let pending = null;
-  up.onclick = function () { document.getElementById("fileProf").click(); };
-  document.getElementById("fileProf").onchange = function () {
-    const f = this.files && this.files[0];
-    if (!f || !mine) return;
-    const rd = new FileReader();
-    rd.onload = function () {
-      pending = rd.result;
-      av.innerHTML = '<img alt="" src="' + pending + '">';
-      save.disabled = false;
-    };
-    rd.readAsDataURL(f);
-  };
-  save.onclick = function () {
-    if (!pending || !mine) return;
-    saveOwnAvatar(pending);
-    if (!net.profiles) net.profiles = {};
-    net.profiles[color] = Object.assign(p, {av: pending});
-    relay({kind:"profile", color: color, profile: net.profiles[color]});
+  if (up) up.style.display = "none";
+  if (save) {
+    save.style.display = "none";
     save.disabled = true;
-    addLog("Đã lưu ảnh đại diện.");
-  };
-  document.getElementById("profPop").classList.add("show");
+  }
+  let pending = null;
+  if (up) up.onclick = function () { document.getElementById("fileProf").click(); };
+  const fileProf = document.getElementById("fileProf");
+  if (fileProf) {
+    fileProf.onchange = function () {
+      const f = this.files && this.files[0];
+      if (!f || !mine) return;
+      const rd = new FileReader();
+      rd.onload = function () {
+        pending = rd.result;
+        if (av) av.innerHTML = '<img alt="" src="' + pending + '">';
+        if (save) save.disabled = false;
+      };
+      rd.readAsDataURL(f);
+    };
+  }
+  if (save) {
+    save.onclick = function () {
+      if (!pending || !mine) return;
+      saveOwnAvatar(pending);
+      if (!net.profiles) net.profiles = {};
+      net.profiles[color] = Object.assign(p, {av: pending});
+      relay({kind:"profile", color: color, profile: net.profiles[color]});
+      save.disabled = true;
+      addLog("Đã lưu ảnh đại diện.");
+    };
+  }
+  const pPop = document.getElementById("profPop");
+  if (pPop) pPop.classList.add("show");
 }
-document.getElementById("avRed").onclick = function () { openProfile("red"); };
-document.getElementById("avBlack").onclick = function () { openProfile("black"); };
-document.getElementById("btnProfClose").onclick = function () {
-  document.getElementById("profPop").classList.remove("show");
-};
+
+const avRed = document.getElementById("avRed");
+if (avRed) avRed.onclick = function () { openProfile("red"); };
+const avBlack = document.getElementById("avBlack");
+if (avBlack) avBlack.onclick = function () { openProfile("black"); };
+const btnProfClose = document.getElementById("btnProfClose");
+if (btnProfClose) {
+  btnProfClose.onclick = function () {
+    const pPop = document.getElementById("profPop");
+    if (pPop) pPop.classList.remove("show");
+  };
+}
+
 (function initAvatars() {
   const src = ownAvatarSrc();
   const home = document.getElementById("homeAv");

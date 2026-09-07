@@ -15,6 +15,19 @@ function escapeNetHtml(value) {
   });
 }
 
+// Helpers thao tác DOM an toàn, chống văng lỗi nếu thiếu element
+function safeEl(id) {
+  return document.getElementById(id);
+}
+function safeText(id, txt) {
+  var el = safeEl(id);
+  if (el) el.textContent = txt;
+}
+function safeClick(id, fn) {
+  var el = safeEl(id);
+  if (el) el.onclick = fn;
+}
+
 function netUrl() {
   var proto = location.protocol === "https:" ? "wss://" : "ws://";
   var host = location.host || "localhost:8080";
@@ -32,7 +45,11 @@ function relay(payload) {
 function importGame(g) {
   if (!g) return;
   state = {
-    board: g.board, turn: g.turn, over: g.over, winner: g.winner, ply: g.ply,
+    board: g.board,
+    turn: g.turn,
+    over: g.over,
+    winner: g.winner,
+    ply: g.ply,
     reason: g.reason || null,
     captured: g.captured || { red: [], black: [] },
     quietPly: g.quietPly || 0,
@@ -51,7 +68,7 @@ function importGame(g) {
   hideOverlay();
   hideDrawAsk();
   if (typeof moveLock !== "undefined") moveLock = false;
-  var readyGateEl = document.getElementById("readyGate");
+  var readyGateEl = safeEl("readyGate");
   if (started && !state.over) {
     if (readyGateEl) readyGateEl.classList.remove("show");
     if (typeof hideStartButton === "function") hideStartButton();
@@ -106,11 +123,7 @@ function handleRelay(p) {
       hideOverlay();
       hideDrawAsk();
       if (typeof goTable === "function") goTable();
-      var netHint = document.getElementById("netHint");
-      if (netHint) {
-        netHint.textContent = "Phòng " + net.room + " · bạn cầm " + (net.color === "red" ? "Đỏ" : "Đen") +
-          ". Đợi chủ phòng bắt đầu ván mới.";
-      }
+      safeText("netHint", "Phòng " + net.room + " · bạn cầm " + (net.color === "red" ? "Đỏ" : "Đen") + ". Đợi chủ phòng bắt đầu ván mới.");
       break;
   }
 }
@@ -143,11 +156,7 @@ function applySeat(msg) {
   if (!started && typeof updateReadyUI === "function") updateReadyUI();
   var side = net.color === "red" ? "Đỏ" : net.color === "black" ? "Đen" : "?";
   if (msg.count >= 2 && net.color) {
-    var netHint = document.getElementById("netHint");
-    if (netHint) {
-      netHint.textContent = "Phòng " + net.room + " · bạn cầm " + side +
-        (net.isHost ? ". Bấm Sẵn sàng để bắt đầu." : ". Đợi chủ phòng bấm Sẵn sàng.");
-    }
+    safeText("netHint", "Phòng " + net.room + " · bạn cầm " + side + (net.isHost ? ". Bấm Sẵn sàng để bắt đầu." : ". Đợi chủ phòng bấm Sẵn sàng."));
     addLog("Hai người đã vào phòng. Bạn cầm " + side + ".");
     hideHall();
     shareMyProfile();
@@ -174,7 +183,7 @@ function shareMyProfile() {
   };
   if (!net.profiles) net.profiles = {};
   net.profiles[net.color] = prof;
-  if (prof.av) setAvatar(net.color, prof.av);
+  if (prof.av && typeof setAvatar === "function") setAvatar(net.color, prof.av);
   relay({ kind: "profile", color: net.color, profile: prof });
 }
 
@@ -211,7 +220,7 @@ function onNetMsg(ev) {
       } else {
         started = true;
       }
-      var rGate = document.getElementById("readyGate");
+      var rGate = safeEl("readyGate");
       if (rGate) rGate.classList.remove("show");
       if (typeof startTick === "function") startTick();
       if (!oauthLoginPending) goTable();
@@ -222,27 +231,25 @@ function onNetMsg(ev) {
       break;
 
     case "resume-none":
-      var gWrap = document.getElementById("gameWrap");
+      var gWrap = safeEl("gameWrap");
       if (net.room || (gWrap && gWrap.classList.contains("show"))) {
         addLog("Bàn cũ đã kết thúc do quá hạn chờ kết nối lại.");
-        var nHint = document.getElementById("netHint");
-        if (nHint) nHint.textContent = "Bàn cũ đã kết thúc do quá hạn chờ kết nối lại.";
+        safeText("netHint", "Bàn cũ đã kết thúc do quá hạn chờ kết nối lại.");
         goHome();
       }
       break;
 
     case "error":
       playPending = false;
-      var playButton = document.getElementById("btnPlayNow");
+      var playButton = safeEl("btnPlayNow");
       if (playButton) playButton.disabled = false;
       if (typeof resignPending !== "undefined") {
         resignPending = false;
-        var rBtn = document.getElementById("btnResign");
+        var rBtn = safeEl("btnResign");
         if (rBtn) rBtn.disabled = false;
       }
       if (typeof moveLock !== "undefined") moveLock = false;
-      var netHintErr = document.getElementById("netHint");
-      if (netHintErr) netHintErr.textContent = msg.text;
+      safeText("netHint", msg.text);
       addLog(msg.text);
       if (typeof selected !== "undefined") { selected = null; hints = []; }
       if (typeof draw === "function") draw();
@@ -251,14 +258,14 @@ function onNetMsg(ev) {
     case "resign-accepted":
       if (typeof resignPending !== "undefined") {
         resignPending = false;
-        var rBtnOk = document.getElementById("btnResign");
+        var rBtnOk = safeEl("btnResign");
         if (rBtnOk) rBtnOk.disabled = false;
       }
       break;
 
     case "created":
       playPending = false;
-      var btnPNow = document.getElementById("btnPlayNow");
+      var btnPNow = safeEl("btnPlayNow");
       if (btnPNow) btnPNow.disabled = false;
       net.room = msg.room;
       net.isHost = true;
@@ -272,8 +279,7 @@ function onNetMsg(ev) {
       if (typeof applyVariantUI === "function") applyVariantUI();
       var lock = msg.password ? " (có mật khẩu)" : " (công khai)";
       var wait = msg.waiting ? " Chưa có phòng trống — đang ngồi chờ." : "";
-      var hintCreate = document.getElementById("netHint");
-      if (hintCreate) hintCreate.textContent = "Phòng " + msg.room + lock + ". Ngồi chờ đối thủ." + wait;
+      safeText("netHint", "Phòng " + msg.room + lock + ". Ngồi chờ đối thủ." + wait);
       addLog("Vào phòng chờ " + msg.room + lock);
       net.count = 1;
       if (typeof paintSeats === "function") paintSeats();
@@ -282,22 +288,19 @@ function onNetMsg(ev) {
 
     case "joined":
       playPending = false;
-      var btnPNowJ = document.getElementById("btnPlayNow");
+      var btnPNowJ = safeEl("btnPlayNow");
       if (btnPNowJ) btnPNowJ.disabled = false;
       net.room = msg.room;
       net.isHost = false;
       net.online = true;
       if (!net.profiles) net.profiles = {};
-      myReady = false;
-      peerReady = false;
-      if (msg.variant) net.variant = msg.variant === "tuong" ? "tuong" : "up";
-      if (typeof applyVariantUI === "function") applyVariantUI();
       myReady = !!msg.ready;
       peerReady = !!msg.peerReady;
+      if (msg.variant) net.variant = msg.variant === "tuong" ? "tuong" : "up";
+      if (typeof applyVariantUI === "function") applyVariantUI();
       if (msg.color) net.color = msg.color;
       if (msg.profile && net.color) net.profiles[net.color] = msg.profile;
-      var hintJoin = document.getElementById("netHint");
-      if (hintJoin) hintJoin.textContent = "Đã vào " + msg.room + ".";
+      safeText("netHint", "Đã vào " + msg.room + ".");
       addLog("Đã vào phòng " + msg.room);
       if (!oauthLoginPending) goTable();
       if (typeof applyViewLayout === "function") applyViewLayout();
@@ -324,7 +327,9 @@ function onNetMsg(ev) {
       break;
 
     case "spec-join":
-      if (!net.spectate && state) relay({ kind: "sync", game: exportGame() });
+      if (!net.spectate && state && typeof exportGame === "function") {
+        relay({ kind: "sync", game: exportGame() });
+      }
       break;
 
     case "presence":
@@ -376,23 +381,25 @@ function onNetMsg(ev) {
       break;
 
     case "otp":
-      document.getElementById("authTitle").textContent = "OTP lấy lại mật khẩu";
-      document.getElementById("authText").textContent = msg.text;
-      document.getElementById("authOtp").style.display = "inline-block";
-      document.getElementById("authNewPass").style.display = "inline-block";
-      document.getElementById("authPop").classList.add("show");
+      safeText("authTitle", "OTP lấy lại mật khẩu");
+      safeText("authText", msg.text);
+      var authOtp = safeEl("authOtp");
+      var authNewPass = safeEl("authNewPass");
+      var authPop = safeEl("authPop");
+      if (authOtp) authOtp.style.display = "inline-block";
+      if (authNewPass) authNewPass.style.display = "inline-block";
+      if (authPop) authPop.classList.add("show");
       pendingAuth = { kind: "reset", contact: msg.contact };
       break;
 
     case "account":
       net.account = msg.acc;
-      var hName = document.getElementById("homeName");
+      var hName = safeEl("homeName");
       if (hName) {
         hName.value = msg.acc.name;
         hName.classList.remove("guest-name");
       }
-      var hHint = document.getElementById("homeHint");
-      if (hHint) hHint.textContent = "Đã đăng ký: " + msg.acc.name + " · " + msg.acc.via;
+      safeText("homeHint", "Đã đăng ký: " + msg.acc.name + " · " + msg.acc.via);
       var me2 = loadMe();
       me2.name = msg.acc.name;
       me2.contact = msg.acc.contact;
@@ -400,7 +407,7 @@ function onNetMsg(ev) {
       saveMe(me2);
       if (typeof paintHomeProfile === "function") paintHomeProfile();
       else if (msg.acc.av) {
-        var hAv = document.getElementById("homeAv");
+        var hAv = safeEl("homeAv");
         if (hAv) hAv.innerHTML = '<img alt="" src="' + msg.acc.av + '">';
       }
       if (msg.acc.stats && typeof saveStats === "function") saveStats(msg.acc.stats);
@@ -411,23 +418,21 @@ function onNetMsg(ev) {
       if (typeof paintSeats === "function") paintSeats();
       net.guest = false;
       if (oauthLoginPending) {
-      oauthLoginPending = false;
-      clearRoomState(true);
-      // Đóng cổng đăng nhập và hiển thị thẳng Trang chính (Home)
-      document.getElementById("loginGate").classList.remove("show");
-      document.getElementById("home").classList.add("show");
-      document.getElementById("gameWrap").classList.remove("show");
-      document.getElementById("hub").classList.remove("show");
+        oauthLoginPending = false;
+        clearRoomState(true);
       }
-      document.getElementById("loginGate").classList.remove("show");
-      document.getElementById("authPop").classList.remove("show");
+      var lGate = safeEl("loginGate");
+      var aPop = safeEl("authPop");
+      if (lGate) lGate.classList.remove("show");
+      if (aPop) aPop.classList.remove("show");
       if (window.oauthWin && !window.oauthWin.closed) {
         try { window.oauthWin.close(); } catch (e) {}
         window.oauthWin = null;
       }
       applyAuthUI();
+      var pPop = safeEl("profilePop");
       if (msg.needProfile && !(msg.acc && msg.acc.name)) openProfilePop();
-      else document.getElementById("profilePop").classList.remove("show");
+      else if (pPop) pPop.classList.remove("show");
       break;
 
     case "ready-state":
@@ -469,7 +474,7 @@ function onNetMsg(ev) {
         if (typeof applyVariantUI === "function") applyVariantUI();
       }
       if (typeof hideStartButton === "function") hideStartButton();
-      var rGateStart = document.getElementById("readyGate");
+      var rGateStart = safeEl("readyGate");
       if (rGateStart) rGateStart.classList.remove("show");
       if (typeof msg.color === "string") net.color = msg.color;
       if (typeof msg.isHost === "boolean") net.isHost = msg.isHost;
@@ -517,8 +522,7 @@ function onNetMsg(ev) {
 }
 
 function connectNet(cb) {
-  var netHint = document.getElementById("netHint");
-  if (netHint) netHint.textContent = "Đang kết nối máy chủ...";
+  safeText("netHint", "Đang kết nối máy chủ...");
   if (net.ws && net.ws.readyState === 1) { if (cb) cb(); return; }
   if (cb) netConnectWaiters.push(cb);
   if (net.ws && net.ws.readyState === 0) return;
@@ -527,14 +531,13 @@ function connectNet(cb) {
   } catch (e) {
     net.ws = null;
     netConnectWaiters = [];
-    if (netHint) netHint.textContent = "Không mở được WebSocket.";
+    safeText("netHint", "Không mở được WebSocket.");
     scheduleReconnect();
     return;
   }
   var socket = net.ws;
   socket.onopen = function () {
-    var hint = document.getElementById("netHint");
-    if (hint) hint.textContent = "Đã kết nối. Tạo hoặc vào phòng.";
+    safeText("netHint", "Đã kết nối. Tạo hoặc vào phòng.");
     netReconnectDelay = 2000;
     clearTimeout(netReconnectTimer);
     var tok = sessionStorage.getItem("coupSess");
@@ -550,7 +553,7 @@ function connectNet(cb) {
     net.ws = null;
     netConnectWaiters = [];
     playPending = false;
-    var playButton = document.getElementById("btnPlayNow");
+    var playButton = safeEl("btnPlayNow");
     if (playButton) playButton.disabled = false;
     if (started && state && !state.over && net.online && !net.vsBot && !net.spectate && typeof stopTick === "function") {
       stopTick();
@@ -558,8 +561,7 @@ function connectNet(cb) {
     scheduleReconnect();
   };
   socket.onerror = function () {
-    var hint = document.getElementById("netHint");
-    if (hint) hint.textContent = "Lỗi kết nối. Chạy server rồi mở http://localhost:8080";
+    safeText("netHint", "Lỗi kết nối. Chạy server rồi mở http://localhost:8080");
   };
 }
 
@@ -574,21 +576,26 @@ function scheduleReconnect() {
 window.addEventListener("online", function () {
   if (!net.ws || net.ws.readyState === 3) connectNet();
 });
+
 function goLogin() {
   hideHall();
-  document.getElementById("hub").classList.remove("show");
-  document.getElementById("home").classList.add("show");
-  document.getElementById("gameWrap").classList.remove("show");
-  document.getElementById("loginGate").classList.add("show");
+  var hub = safeEl("hub"), home = safeEl("home"), gWrap = safeEl("gameWrap"), lGate = safeEl("loginGate");
+  if (hub) hub.classList.remove("show");
+  if (home) home.classList.add("show");
+  if (gWrap) gWrap.classList.remove("show");
+  if (lGate) lGate.classList.add("show");
 }
+
 function goHub() {
   hideHall();
-  document.getElementById("loginGate").classList.remove("show");
-  document.getElementById("home").classList.add("show");
-  document.getElementById("gameWrap").classList.remove("show");
-  document.getElementById("hub").classList.remove("show");
+  var lGate = safeEl("loginGate"), home = safeEl("home"), gWrap = safeEl("gameWrap"), hub = safeEl("hub");
+  if (lGate) lGate.classList.remove("show");
+  if (home) home.classList.add("show");
+  if (gWrap) gWrap.classList.remove("show");
+  if (hub) hub.classList.remove("show");
   net.vsBot = false;
 }
+
 function clearRoomState(sendLeave) {
   if (sendLeave && net.room) netSend({ type: "leave" });
   net.room = null;
@@ -606,7 +613,7 @@ function clearRoomState(sendLeave) {
 }
 
 function applyVariantUI() {
-  var brand = document.getElementById("homeBrand");
+  var brand = safeEl("homeBrand");
   if (brand) brand.textContent = net.variant === "tuong" ? "CỜ TƯỚNG" : "CỜ ÚP TU TIÊN";
 }
 
@@ -615,15 +622,17 @@ function openMode(variant) {
   net.vsBot = false;
   if (typeof resetBoard === "function") resetBoard();
   applyVariantUI();
-  document.getElementById("hub").classList.remove("show");
-  document.getElementById("home").classList.add("show");
+  var hub = safeEl("hub"), home = safeEl("home");
+  if (hub) hub.classList.remove("show");
+  if (home) home.classList.add("show");
 }
 
 function goHome() {
   hideHall();
-  document.getElementById("hub").classList.remove("show");
-  document.getElementById("home").classList.add("show");
-  document.getElementById("gameWrap").classList.remove("show");
+  var hub = safeEl("hub"), home = safeEl("home"), gWrap = safeEl("gameWrap");
+  if (hub) hub.classList.remove("show");
+  if (home) home.classList.add("show");
+  if (gWrap) gWrap.classList.remove("show");
   applyVariantUI();
   if (typeof stopMusic === "function") stopMusic();
   if (typeof stopTracks === "function") stopTracks();
@@ -633,9 +642,10 @@ function goHome() {
 }
 
 function goTable() {
-  document.getElementById("home").classList.remove("show");
+  var home = safeEl("home"), gWrap = safeEl("gameWrap");
+  if (home) home.classList.remove("show");
   hideHall();
-  document.getElementById("gameWrap").classList.add("show");
+  if (gWrap) gWrap.classList.add("show");
   if (typeof clearChatLog === "function") clearChatLog();
   if (typeof stopHomeMusic === "function") stopHomeMusic();
   if (typeof startMusic === "function") startMusic();
@@ -645,12 +655,14 @@ function goTable() {
 }
 
 function showHall() {
-  document.getElementById("hall").classList.add("show");
+  var hall = safeEl("hall");
+  if (hall) hall.classList.add("show");
   netSend({ type: "list" });
 }
 
 function hideHall() {
-  document.getElementById("hall").classList.remove("show");
+  var hall = safeEl("hall");
+  if (hall) hall.classList.remove("show");
 }
 
 function joinTable(t) {
@@ -666,9 +678,9 @@ function joinTable(t) {
 }
 
 function renderOnline(list, n) {
-  var btn = document.getElementById("btnOnline");
+  var btn = safeEl("btnOnline");
   if (btn) btn.textContent = (n || list.length || 0) + " người đang online";
-  var box = document.getElementById("onlineList");
+  var box = safeEl("onlineList");
   if (!box) return;
   box.innerHTML = "";
   if (!list.length) {
@@ -702,7 +714,7 @@ function renderOnline(list, n) {
 }
 
 function renderHall(tables) {
-  var strip = document.getElementById("hallStrip");
+  var strip = safeEl("hallStrip");
   if (!strip) return;
   strip.innerHTML = "";
   tables = (tables || []).filter(function (t) {
@@ -737,7 +749,7 @@ function renderHall(tables) {
 }
 
 (function bindHallDrag() {
-  var el = document.getElementById("hallStrip");
+  var el = safeEl("hallStrip");
   if (!el) return;
   var down = false, dragged = false, x0 = 0, sl = 0;
   el.addEventListener("pointerdown", function (e) {
@@ -755,11 +767,6 @@ function renderHall(tables) {
     if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; }
   }, true);
 })();
-
-document.getElementById("btnHallBack").onclick = function () {
-  hideHall();
-  goHome();
-};
 
 function clientKey() {
   var id = sessionStorage.getItem("coupClient");
@@ -786,39 +793,38 @@ function saveMe(me) {
 function signedIn() { return !!(net.account || net.guest); }
 
 function applyAuthUI() {
-  var out = document.getElementById("btnLogout");
-  var gate = document.getElementById("loginGate");
+  var out = safeEl("btnLogout");
+  var gate = safeEl("loginGate");
   var isAuth = signedIn();
   if (out) out.style.display = isAuth ? "inline-block" : "none";
   if (gate) gate.classList.toggle("show", !isAuth);
 
-  var onGame = document.getElementById("gameWrap").classList.contains("show");
+  var gameWrap = safeEl("gameWrap");
+  var onGame = gameWrap && gameWrap.classList.contains("show");
+  var homeEl = safeEl("home");
+  var hubEl = safeEl("hub");
 
   if (isAuth) {
-    // Đã đăng nhập: tắt cổng đăng nhập, nếu không trong bàn chơi thì hiển thị trang chính
-    if (!onGame) {
-      document.getElementById("home").classList.add("show");
-    }
-    document.getElementById("loginGate").classList.remove("show");
-    document.getElementById("hub").classList.remove("show");
+    if (!onGame && homeEl) homeEl.classList.add("show");
+    if (gate) gate.classList.remove("show");
+    if (hubEl) hubEl.classList.remove("show");
   } else {
-    // Chưa đăng nhập: giữ trang chính làm nền để cửa sổ kính mờ nhìn xuyên thấu vào
-    document.getElementById("home").classList.add("show");
-    document.getElementById("gameWrap").classList.remove("show");
-    document.getElementById("hub").classList.remove("show");
+    if (homeEl) homeEl.classList.add("show");
+    if (gameWrap) gameWrap.classList.remove("show");
+    if (hubEl) hubEl.classList.remove("show");
   }
-  var hint = document.getElementById("homeHint");
+  var hint = safeEl("homeHint");
   if (!hint) return;
   if (net.account) {
     hint.textContent = "Xin chào " + (net.account.name || "đạo hữu") + " · " + (net.account.provider || net.account.via || "tài khoản");
-    var nma = document.getElementById("homeName");
+    var nma = safeEl("homeName");
     if (nma) {
       nma.classList.remove("guest-name");
       if (net.account.name) nma.value = net.account.name;
     }
   } else if (net.guest) {
     hint.textContent = "Đang vào với tư cách khách. Thành tích không lưu.";
-    var nm = document.getElementById("homeName");
+    var nm = safeEl("homeName");
     if (nm) {
       nm.value = "KHÁCH";
       nm.classList.add("guest-name");
@@ -832,24 +838,23 @@ function applyAuthUI() {
 function mustLogin() {
   if (signedIn()) return true;
   applyAuthUI();
-  var hHint = document.getElementById("homeHint");
-  if (hHint) hHint.textContent = "Cần vào với tư cách khách hoặc đăng nhập Google/Facebook.";
+  safeText("homeHint", "Cần vào với tư cách khách hoặc đăng nhập Google/Facebook.");
   return false;
 }
 
 function openProfilePop() {
-  var pop = document.getElementById("profilePop");
+  var pop = safeEl("profilePop");
   if (pop) pop.classList.add("show");
 }
 
 function sendHello() {
-  var nameInp = document.getElementById("homeName");
+  var nameInp = safeEl("homeName");
   var name = (nameInp && nameInp.value) || loadMe().name || "Đạo hữu";
   netSend({ type: "hello", name: name });
 }
 
 function renderFind(list) {
-  var box = document.getElementById("findList");
+  var box = safeEl("findList");
   if (!box) return;
   box.innerHTML = "";
   if (!list.length) { box.textContent = "Không thấy đạo hữu khớp."; return; }
@@ -871,28 +876,30 @@ function renderFind(list) {
 }
 
 function showInvite(msg) {
-  document.getElementById("inviteText").textContent = (msg.fromName || "Đạo hữu") + " mời bạn tỷ thí.";
-  document.getElementById("invitePop").classList.add("show");
-  document.getElementById("btnInvYes").onclick = function () {
-    document.getElementById("invitePop").classList.remove("show");
+  safeText("inviteText", (msg.fromName || "Đạo hữu") + " mời bạn tỷ thí.");
+  var invPop = safeEl("invitePop");
+  if (invPop) invPop.classList.add("show");
+  safeClick("btnInvYes", function () {
+    if (invPop) invPop.classList.remove("show");
     netSend({ type: "invite-ok", fromId: msg.fromId });
-    document.getElementById("home").classList.remove("show");
+    var home = safeEl("home");
+    if (home) home.classList.remove("show");
     if (typeof goTable === "function") goTable();
-  };
-  document.getElementById("btnInvNo").onclick = function () {
-    document.getElementById("invitePop").classList.remove("show");
+  });
+  safeClick("btnInvNo", function () {
+    if (invPop) invPop.classList.remove("show");
     netSend({ type: "invite-no", fromId: msg.fromId });
-  };
+  });
 }
 
 (function initHome() {
   var me = loadMe();
-  var homeNameEl = document.getElementById("homeName");
-  var homeAvEl = document.getElementById("homeAv");
+  var homeNameEl = safeEl("homeName");
+  var homeAvEl = safeEl("homeAv");
   if (me.name && homeNameEl) homeNameEl.value = me.name;
   if (me.av && homeAvEl) homeAvEl.innerHTML = '<img alt="" src="' + me.av + '">';
-  var hm = document.getElementById("btnHomeMusic");
-  var hv = document.getElementById("volHome");
+  var hm = safeEl("btnHomeMusic");
+  var hv = safeEl("volHome");
   if (hv) hv.value = Math.round((typeof homeVol !== "undefined" ? homeVol : 0.35) * 100);
   if (hm) {
     hm.onclick = function () {
@@ -905,104 +912,73 @@ function showInvite(msg) {
   if (hv) {
     hv.oninput = function () {
       homeVol = Math.max(0, Math.min(1, (this.value | 0) / 100));
-      var el = document.getElementById("audHome");
+      var el = safeEl("audHome");
       if (el) el.volume = homeVol;
       if (homeMusicOn && (typeof homeTimer === "undefined" || !homeTimer)) startHomeMusic();
     };
   }
-  var homeEl = document.getElementById("home");
+  var homeEl = safeEl("home");
   if (homeEl) {
     homeEl.addEventListener("click", function once() {
       if (homeMusicOn) startHomeMusic();
     }, { once: true });
   }
-  var pendingHomeAv = null;
-  var avStage = 0;
-  var btnSaveAv = document.getElementById("btnHomeSave");
-  var btnBrowseAv = document.getElementById("btnHomeBrowse");
-  var btnSaveNm = document.getElementById("btnSaveName");
-  var nameInp = document.getElementById("homeName");
 
-  function hideAvBtns() {
-    btnSaveAv.hidden = true;
-    btnBrowseAv.hidden = true;
-    avStage = 0;
-  }
-  function showSavedHomeAv() {
-    var cur = loadMe();
-    var el = document.getElementById("homeAv");
-    if (!el) return;
-    if (cur.av) el.innerHTML = '<img alt="" src="' + cur.av + '">';
-    else el.innerHTML = '<span class="ph">🧙</span>';
-  }
-  function canChangeAv() {
+  var pendingAvatarData = null;
+  var oldAvatarHtml = "";
+
+  function saveAvatarConfirmed(dataUrl) {
+    var el = safeEl("homeAv");
+    if (el) el.innerHTML = '<img alt="" src="' + dataUrl + '">';
+
     var meLocal = loadMe();
-    var at = (net.account && net.account.avatarAt) || meLocal.avatarAt || 0;
-    var w = typeof daysLeft === "function" ? daysLeft(at) : 0;
-    if (w > 0) {
-      var hint = document.getElementById("homeHint");
-      if (hint) hint.textContent = "Ảnh chỉ đổi 30 ngày/lần. Còn " + w + " ngày.";
-      return false;
-    }
-    return true;
+    meLocal.av = dataUrl;
+    meLocal.avatarAt = Date.now();
+    saveMe(meLocal);
+
+    if (typeof saveOwnAvatar === "function") saveOwnAvatar(dataUrl);
+    if (net.account) netSend({ type: "profile-save", av: dataUrl });
+    if (typeof shareMyProfile === "function") shareMyProfile();
   }
-  function previewAv(data) {
-    pendingHomeAv = data;
-    var el = document.getElementById("homeAv");
-    if (el) el.innerHTML = '<img alt="" src="' + data + '">';
-    btnSaveAv.hidden = false;
-    btnBrowseAv.hidden = true;
-    avStage = 1;
+
+  function handleAvatarSelect(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      pendingAvatarData = rd.result;
+      var el = safeEl("homeAv");
+      oldAvatarHtml = el ? el.innerHTML : "";
+      if (el) el.innerHTML = '<img alt="" src="' + pendingAvatarData + '">';
+
+      safeText("authTitle", "Đổi hình đại diện");
+      safeText("authText", "Đạo hữu có muốn chọn ảnh này làm hình đại diện không?");
+      var authOtp = safeEl("authOtp");
+      var authNewPass = safeEl("authNewPass");
+      var authPop = safeEl("authPop");
+      if (authOtp) authOtp.style.display = "none";
+      if (authNewPass) authNewPass.style.display = "none";
+      if (authPop) authPop.classList.add("show");
+      pendingAuth = "avatar";
+    };
+    rd.readAsDataURL(file);
   }
-  document.getElementById("homeAv").onclick = function (ev) {
+
+  safeClick("homeAv", function (ev) {
     ev.stopPropagation();
-    if (!canChangeAv()) return;
-    document.getElementById("fileHome").click();
-  };
-  document.getElementById("homeAv").addEventListener("dragover", function (ev) {
-    ev.preventDefault();
+    var fileInput = safeEl("fileHome");
+    if (fileInput) fileInput.click();
   });
-  document.getElementById("homeAv").addEventListener("drop", function (ev) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (!canChangeAv()) return;
-    var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
-    if (!f || !f.type.startsWith("image/")) return;
-    var rd = new FileReader();
-    rd.onload = function () { previewAv(rd.result); };
-    rd.readAsDataURL(f);
-  });
-  document.getElementById("fileHome").onchange = function () {
-    var f = this.files && this.files[0];
-    if (!f) return;
-    var rd = new FileReader();
-    rd.onload = function () { previewAv(rd.result); };
-    rd.readAsDataURL(f);
-  };
-  btnSaveAv.onclick = function (ev) {
-    ev.stopPropagation();
-    if (!pendingHomeAv) return;
-    var ok = typeof saveOwnAvatar === "function" ? saveOwnAvatar(pendingHomeAv) : true;
-    if (!ok) { showSavedHomeAv(); hideAvBtns(); return; }
-    if (net.account) netSend({ type: "profile-save", av: pendingHomeAv });
-    pendingHomeAv = null;
-    btnSaveAv.hidden = true;
-    btnBrowseAv.hidden = false;
-    avStage = 2;
-  };
-  btnBrowseAv.onclick = function (ev) {
-    ev.stopPropagation();
-    hideAvBtns();
-    document.getElementById("fileHome").value = "";
-  };
-  document.addEventListener("click", function (ev) {
-    if (avStage !== 1 || !pendingHomeAv) return;
-    if (ev.target.closest && (ev.target.closest("#homeAv") || ev.target.closest("#btnHomeSave") || ev.target.closest("#btnHomeBrowse") || ev.target.id === "fileHome")) return;
-    pendingHomeAv = null;
-    document.getElementById("fileHome").value = "";
-    hideAvBtns();
-    showSavedHomeAv();
-  });
+
+  var fileHome = safeEl("fileHome");
+  if (fileHome) {
+    fileHome.onchange = function () {
+      var f = this.files && this.files[0];
+      handleAvatarSelect(f);
+    };
+  }
+
+  var nameInp = safeEl("homeName");
+  var btnSaveNm = safeEl("btnSaveName");
 
   function nameLocked() {
     var meLocal = loadMe();
@@ -1011,51 +987,58 @@ function showInvite(msg) {
     return !!(meLocal.name && w > 0);
   }
   function lockNameField() {
+    if (!nameInp) return;
     nameInp.readOnly = true;
     nameInp.classList.remove("edit");
     nameInp.classList.toggle("locked", nameLocked());
   }
-  nameInp.onclick = function () {
-    if (nameLocked()) {
-      var meLocal = loadMe();
-      var at = (net.account && net.account.renamedAt) || meLocal.renamedAt || 0;
-      var hint = document.getElementById("homeHint");
-      if (hint) hint.textContent = "Tên chỉ đổi 30 ngày/lần. Còn " + daysLeft(at) + " ngày.";
-      this.readOnly = true;
-      this.classList.remove("edit");
-      this.blur();
-      return;
-    }
-    this.readOnly = false;
-    this.classList.add("edit");
-    this.focus();
-  };
-  nameInp.oninput = function () {
-    var next = this.value.trim();
-    var cur = loadMe().name || "";
-    var ok = /^[A-Za-z0-9_]{6,24}$/.test(next) && next !== cur;
-    btnSaveNm.hidden = !ok;
-  };
-  nameInp.onblur = function () {
-    setTimeout(function () {
-      if (btnSaveNm.hidden) {
-        nameInp.readOnly = true;
-        nameInp.classList.remove("edit");
-        nameInp.value = loadMe().name || nameInp.value;
+
+  if (nameInp) {
+    nameInp.onclick = function () {
+      if (nameLocked()) {
+        var meLocal = loadMe();
+        var at = (net.account && net.account.renamedAt) || meLocal.renamedAt || 0;
+        safeText("homeHint", "Tên chỉ đổi 30 ngày/lần. Còn " + (typeof daysLeft === "function" ? daysLeft(at) : 0) + " ngày.");
+        this.readOnly = true;
+        this.classList.remove("edit");
+        this.blur();
+        return;
       }
-    }, 180);
-  };
-  btnSaveNm.onclick = function () {
-    var name = nameInp.value;
-    var ok = typeof saveOwnName === "function" ? saveOwnName(name) : true;
-    if (!ok) return;
-    connectNet(function () {
-      sendHello();
-      if (net.account) netSend({ type: "rename", name: name });
-    });
-    btnSaveNm.hidden = true;
-    lockNameField();
-  };
+      this.readOnly = false;
+      this.classList.add("edit");
+      this.focus();
+    };
+    nameInp.oninput = function () {
+      var next = this.value.trim();
+      var cur = loadMe().name || "";
+      var ok = /^[A-Za-z0-9_]{6,24}$/.test(next) && next !== cur;
+      if (btnSaveNm) btnSaveNm.hidden = !ok;
+    };
+    nameInp.onblur = function () {
+      setTimeout(function () {
+        if (btnSaveNm && btnSaveNm.hidden && nameInp) {
+          nameInp.readOnly = true;
+          nameInp.classList.remove("edit");
+          nameInp.value = loadMe().name || nameInp.value;
+        }
+      }, 180);
+    };
+  }
+
+  if (btnSaveNm) {
+    btnSaveNm.onclick = function () {
+      if (!nameInp) return;
+      var name = nameInp.value;
+      var ok = typeof saveOwnName === "function" ? saveOwnName(name) : true;
+      if (!ok) return;
+      connectNet(function () {
+        sendHello();
+        if (net.account) netSend({ type: "rename", name: name });
+      });
+      btnSaveNm.hidden = true;
+      lockNameField();
+    };
+  }
   lockNameField();
 
   window.oauthWin = null;
@@ -1081,8 +1064,7 @@ function showInvite(msg) {
     window.focus();
     if (!ev.data.ok) {
       oauthLoginPending = false;
-      var oHint = document.getElementById("oauthHint");
-      if (oHint) oHint.textContent = "Đăng nhập không thành công hoặc chưa cấu hình OAuth.";
+      safeText("oauthHint", "Đăng nhập không thành công hoặc chưa cấu hình OAuth.");
       return;
     }
     connectNet(function () {
@@ -1106,67 +1088,99 @@ function showInvite(msg) {
     history.replaceState({}, "", location.pathname);
   }
 
-  document.getElementById("btnLoginGuest").onclick = function () {
+  safeClick("btnHallBack", function () {
+    hideHall();
+    goHome();
+  });
+  safeClick("btnLoginGuest", function () {
     oauthLoginPending = false;
     net.guest = true;
     net.account = null;
     clearRoomState(true);
     goHub();
     applyAuthUI();
-  };
-  document.getElementById("btnGoogle").onclick = function () { openOAuth("google"); };
-  document.getElementById("btnFacebook").onclick = function () { openOAuth("facebook"); };
-  document.getElementById("btnProfileOk").onclick = function () {
-    var name = document.getElementById("newProfileName").value.trim();
+  });
+  safeClick("btnGoogle", function () { openOAuth("google"); });
+  safeClick("btnFacebook", function () { openOAuth("facebook"); });
+  safeClick("btnProfileOk", function () {
+    var pInput = safeEl("newProfileName");
+    var name = pInput ? pInput.value.trim() : "";
     if (!/^[A-Za-z0-9_]{6,24}$/.test(name)) {
       addLog("Tên 6-24 ký tự, chỉ chữ không dấu/số/gạch dưới, không khoảng trắng.");
       return;
     }
     connectNet(function () { netSend({ type: "profile-create", name: name }); });
-  };
-  document.getElementById("btnLogout").onclick = function () {
-    document.getElementById("authTitle").textContent = "Đăng xuất";
-    document.getElementById("authText").textContent = "Đồng ý đăng xuất?";
-    document.getElementById("authPop").classList.add("show");
+  });
+  safeClick("btnLogout", function () {
+    safeText("authTitle", "Đăng xuất");
+    safeText("authText", "Đồng ý đăng xuất?");
+    var aPop = safeEl("authPop");
+    if (aPop) aPop.classList.add("show");
     pendingAuth = "logout";
-  };
-  document.getElementById("btnAuthNo").onclick = function () {
-    document.getElementById("authPop").classList.remove("show");
-    pendingAuth = null;
-  };
-  document.getElementById("btnAuthYes").onclick = function () {
+  });
+  safeClick("btnAuthYes", function () {
     if (pendingAuth === "logout") {
       net.account = null;
       net.guest = false;
       netSend({ type: "logout" });
       applyAuthUI();
+    } else if (pendingAuth === "avatar") {
+      if (pendingAvatarData) saveAvatarConfirmed(pendingAvatarData);
+      pendingAvatarData = null;
     }
-    document.getElementById("authPop").classList.remove("show");
-  };
-  document.getElementById("btnFind").onclick = function () {
+    var aPop = safeEl("authPop");
+    if (aPop) aPop.classList.remove("show");
+    pendingAuth = null;
+    var fH = safeEl("fileHome");
+    if (fH) fH.value = "";
+  });
+
+  safeClick("btnAuthNo", function () {
+    if (pendingAuth === "avatar") {
+      var el = safeEl("homeAv");
+      if (el && oldAvatarHtml) el.innerHTML = oldAvatarHtml;
+      pendingAvatarData = null;
+    }
+    var aPop = safeEl("authPop");
+    if (aPop) aPop.classList.remove("show");
+    pendingAuth = null;
+    var fH = safeEl("fileHome");
+    if (fH) fH.value = "";
+  });
+
+  safeClick("btnFind", function () {
+    var findInp = safeEl("findName");
     connectNet(function () {
       sendHello();
-      netSend({ type: "search", q: document.getElementById("findName").value });
+      netSend({ type: "search", q: findInp ? findInp.value : "" });
     });
-  };
-  document.getElementById("findName").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") document.getElementById("btnFind").click();
   });
-  document.getElementById("btnPlayNow").onclick = function () {
+
+  var findInput = safeEl("findName");
+  if (findInput) {
+    findInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        var bFind = safeEl("btnFind");
+        if (bFind) bFind.click();
+      }
+    });
+  }
+
+  safeClick("btnPlayNow", function () {
     if (!mustLogin()) return;
     if (playPending) return;
     oauthLoginPending = false;
     net.vsBot = false;
     playPending = true;
     this.disabled = true;
-    var hint = document.getElementById("netHint");
-    if (hint) hint.textContent = "Đang tìm phòng...";
+    safeText("netHint", "Đang tìm phòng...");
     connectNet(function () {
       sendHello();
       netSend({ type: "play", variant: net.variant || "up" });
     });
-  };
-  document.getElementById("btnVsBot").onclick = function () {
+  });
+
+  safeClick("btnVsBot", function () {
     if (!mustLogin()) return;
     net.vsBot = true;
     net.room = "BOT";
@@ -1180,19 +1194,19 @@ function showInvite(msg) {
     goTable();
     if (typeof resetBoard === "function") resetBoard();
     started = false;
-    var gate = document.getElementById("readyGate");
-    var start = document.getElementById("btnStart");
+    var gate = safeEl("readyGate");
+    var start = safeEl("btnStart");
     if (gate) gate.classList.add("show");
     if (start) { start.style.display = "inline-block"; start.textContent = "Bắt đầu"; }
     if (typeof updateReadyUI === "function") updateReadyUI();
     if (typeof renderModes === "function") renderModes();
-    var hint = document.getElementById("netHint");
-    if (hint) hint.textContent = "Chơi với máy · bạn cầm Đỏ. Bấm Bắt đầu.";
-  };
-  document.getElementById("btnPickUp").onclick = function () { openMode("up"); };
-  document.getElementById("btnPickTuong").onclick = function () { openMode("tuong"); };
-  document.getElementById("btnBackHub").onclick = function () { goHub(); };
-  document.getElementById("btnHubLogin").onclick = function () { goLogin(); };
+    safeText("netHint", "Chơi với máy · bạn cầm Đỏ. Bấm Bắt đầu.");
+  });
+
+  safeClick("btnPickUp", function () { openMode("up"); });
+  safeClick("btnPickTuong", function () { openMode("tuong"); });
+  safeClick("btnBackHub", function () { goHub(); });
+  safeClick("btnHubLogin", function () { goLogin(); });
 
   function reallyLeave(lost) {
     if (typeof playDoor === "function") playDoor();
@@ -1210,41 +1224,45 @@ function showInvite(msg) {
     net.isHost = false;
     myReady = false;
     peerReady = false;
-    document.getElementById("leavePop").classList.remove("show");
+    var leavePop = safeEl("leavePop");
+    if (leavePop) leavePop.classList.remove("show");
     net.spectate = false;
     net.vsBot = false;
     goHome();
   }
 
-  document.getElementById("btnHome").onclick = function () {
+  safeClick("btnHome", function () {
     if (typeof playDoor === "function") playDoor();
     if (net.spectate) { reallyLeave(false); return; }
     if (started && state && !state.over) {
-      document.getElementById("leavePop").classList.add("show");
+      var leavePop = safeEl("leavePop");
+      if (leavePop) leavePop.classList.add("show");
       return;
     }
     reallyLeave(false);
-  };
-  document.getElementById("btnLeaveYes").onclick = function () { reallyLeave(true); };
-  document.getElementById("btnLeaveNo").onclick = function () {
-    document.getElementById("leavePop").classList.remove("show");
-  };
-  document.getElementById("btnOnline").onclick = function () {
-    var pop = document.getElementById("onlinePop");
+  });
+  safeClick("btnLeaveYes", function () { reallyLeave(true); });
+  safeClick("btnLeaveNo", function () {
+    var leavePop = safeEl("leavePop");
+    if (leavePop) leavePop.classList.remove("show");
+  });
+  safeClick("btnOnline", function () {
+    var pop = safeEl("onlinePop");
     if (pop) pop.classList.toggle("show");
     connectNet(function () { sendHello(); netSend({ type: "online" }); });
-  };
-  document.getElementById("btnBlockInv").onclick = function () {
+  });
+  safeClick("btnBlockInv", function () {
     net.blockInvite = !net.blockInvite;
     this.classList.toggle("on", net.blockInvite);
     this.textContent = net.blockInvite ? "Đang chặn lời mời" : "Cho phép lời mời";
     netSend({ type: "prefs", blockInvite: net.blockInvite });
-  };
-  document.getElementById("btnHallHome").onclick = function () {
+  });
+  safeClick("btnHallHome", function () {
     if (!mustLogin()) return;
-    document.getElementById("home").classList.remove("show");
+    var home = safeEl("home");
+    if (home) home.classList.remove("show");
     connectNet(function () { sendHello(); showHall(); });
-  };
+  });
 
   goLogin();
   applyAuthUI();

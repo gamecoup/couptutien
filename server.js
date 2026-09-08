@@ -2,9 +2,131 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
+const { Pool } = require("pg");
 const store = require("./lib/store");
 const oauth = require("./lib/oauth");
 const rules = require("./lib/rules");
+
+// --- CẤU HÌNH KẾT NỐI SUPABASE (POSTGRESQL) ---
+const rawDbUrl = process.env.DATABASE_URL || process.env.DB_URL || "";
+const cleanDbUrl = rawDbUrl.replace(/^jdbc:/, ""); // Tự động dọn tiền tố jdbc: nếu có
+let pool = null;
+
+if (cleanDbUrl) {
+  pool = new Pool({
+    connectionString: cleanDbUrl,
+    ssl: { rejectUnauthorized: false }
+  });
+  console.log("Đã kết nối với Database Supabase.");
+} else {
+  console.warn("Chưa cấu hình DB_URL trên Render. Tạm thời dùng lưu trữ cục bộ.");
+}
+
+let accsCache = [];
+
+// Khởi tạo và nạp dữ liệu từ Supabase khi server khởi động/thức dậy
+async function initDatabase() {
+  try {
+    accsCache = store.loadAcc() || [];
+  } catch (e) {
+    accsCache = [];
+  }
+
+  if (!pool) return;
+
+  try {
+    const res = await pool.query("SELECT * FROM users");
+    console.log(`Đã nạp ${res.rows.length} tài khoản từ Supabase.`);
+    res.rows.forEach((row) => {
+      const gId = row.google_id;
+      const existing = accsCache.find((a) => a.providerId === gId || a.id === gId);
+      const accObj = {
+        id: gId,
+        name: row.display_name || "",
+        nameSet: !!(row.display_name && row.display_name !== "Kỳ thủ"),
+        contact: row.email || "",
+        email: row.email || "",
+        via: "google",
+        provider: "google",
+        providerId: gId,
+        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+        pts: row.elo != null ? row.elo : 1200,
+        renamedAt: 0,
+        avatarAt: 0,
+        av: row.avatar_url || "",
+        stats: {
+          games: (row.wins || 0) + (row.losses || 0) + (row.draws || 0),
+          wins: row.wins || 0,
+          losses: row.losses || 0,
+          draws: row.draws || 0
+        }
+      };
+
+      if (existing) {
+        Object.assign(existing, accObj);
+      } else {
+        accsCache.push(accObj);
+      }
+    });
+  } catch (err) {
+    console.error("Lỗi nạp dữ liệu từ Supabase:", err.message);
+  }
+}
+
+// Lưu một tài khoản lên Supabase
+async function upsertUserToDB(acc) {
+  if (!pool) return;
+  const gId = String(acc.providerId || acc.id || "");
+  if (!gId) return;
+
+  const email = acc.email || "";
+  const name = acc.name || "Kỳ thủ";
+  const av = acc.av || "";
+  const elo = acc.pts != null ? acc.pts : 1200;
+  const wins = (acc.stats && acc.stats.wins) || 0;
+  const losses = (acc.stats && acc.stats.losses) || 0;
+  const draws = (acc.stats && acc.stats.draws) || 0;
+
+  const query = `
+    INSERT INTO users (google_id, email, display_name, avatar_url, elo, wins, losses, draws, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+    ON CONFLICT (google_id) DO UPDATE SET
+      email = EXCLUDED.email,
+      display_name = CASE WHEN EXCLUDED.display_name <> '' AND EXCLUDED.display_name <> 'Kỳ thủ' THEN EXCLUDED.display_name ELSE users.display_name END,
+      avatar_url = CASE WHEN EXCLUDED.avatar_url <> '' THEN EXCLUDED.avatar_url ELSE users.avatar_url END,
+      elo = EXCLUDED.elo,
+      wins = EXCLUDED.wins,
+      losses = EXCLUDED.losses,
+      draws = EXCLUDED.draws,
+      updated_at = NOW();
+  `;
+
+  try {
+    await pool.query(query, [gId, email, name, av, elo, wins, losses, draws]);
+  } catch (err) {
+    console.error("Lỗi đồng bộ Supabase:", err.message);
+  }
+}
+
+function loadAcc() {
+  return accsCache;
+}
+
+function saveAcc(list) {
+  accsCache = list;
+  try {
+    store.saveAcc(list);
+  } catch (e) {}
+
+  if (pool && Array.isArray(list)) {
+    list.forEach((acc) => upsertUserToDB(acc));
+  }
+}
+
+// Gọi nạp dữ liệu lúc khởi động
+initDatabase();
+
+// --- LOGIC PHÒNG VÀ GAMEPLAY ---
 const sessions = new Map();
 const TIME = {
   3: { game: 180000, move: 15000 },
@@ -14,7 +136,6 @@ const TIME = {
 };
 
 const PORT = process.env.PORT || 8080;
-
 const ROOT = path.join(__dirname, "public");
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -68,7 +189,7 @@ function findOrLinkOAuth(info) {
       provider: info.provider,
       providerId: info.providerId,
       createdAt: Date.now(),
-      pts: 0,
+      pts: 1200,
       renamedAt: 0,
       avatarAt: 0,
       av: "",
@@ -176,8 +297,6 @@ const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 64 * 1024 });
 const rooms = new Map();
 store.ensureDir();
 
-function loadAcc() { return store.loadAcc(); }
-function saveAcc(list) { store.saveAcc(list); }
 function pubAcc(acc) { return store.pubAcc(acc); }
 function norm(s) { return String(s || "").trim().toLowerCase(); }
 const NAME_RE = /^[A-Za-z0-9_]{6,24}$/;
@@ -585,6 +704,20 @@ function finishRoom(room, winner, reason) {
     names: room.players.map((p) => (p.ws && p.ws.profile && p.ws.profile.name) || p.color)
   });
 
+  // Ghi nhận lịch sử ván đấu vào Supabase
+  if (pool && room.players.length >= 2) {
+    const redP = room.players.find((p) => p.color === "red");
+    const blackP = room.players.find((p) => p.color === "black");
+    const redId = redP && redP.ws && redP.ws.account ? (redP.ws.account.providerId || redP.ws.account.id) : null;
+    const blackId = blackP && blackP.ws && blackP.ws.account ? (blackP.ws.account.providerId || blackP.ws.account.id) : null;
+    if (redId && blackId) {
+      pool.query(
+        `INSERT INTO match_history (red_player_id, black_player_id, winner_id, played_at) VALUES ($1, $2, $3, NOW())`,
+        [redId, blackId, winner]
+      ).catch((e) => console.error("Lỗi ghi nhận lịch sử Supabase:", e.message));
+    }
+  }
+
   room.game = null;
   room.clocks = null;
 
@@ -612,7 +745,7 @@ setInterval(function () {
 function findWaiting(exceptWs, variant) {
   pruneAll();
   const v = variant === "tuong" ? "tuong" : "up";
-  const pool = [];
+  const poolList = [];
   for (const r of rooms.values()) {
     if (r.password) continue;
     if (r.busy) continue;
@@ -620,10 +753,10 @@ function findWaiting(exceptWs, variant) {
     if (r.players.length !== 1) continue;
     if (r.players[0].ws === exceptWs) continue;
     if (!live(r.players[0].ws)) continue;
-    pool.push(r);
+    poolList.push(r);
   }
-  if (!pool.length) return null;
-  return pool[Math.floor(Math.random() * pool.length)];
+  if (!poolList.length) return null;
+  return poolList[Math.floor(Math.random() * poolList.length)];
 }
 
 function assignColorsAndJoin(room, ws) {

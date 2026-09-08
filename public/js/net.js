@@ -368,9 +368,14 @@ function onNetMsg(ev) {
     case "seated":
       applySeat(msg);
       break;
+      case "peer-join":
+      if (typeof playRoomSound === "function") playRoomSound("join");
+      else if (typeof playDoor === "function") playDoor();
+      break;
 
     case "peer-left":
-      if (typeof playDoor === "function") playDoor();
+      if (typeof playRoomSound === "function") playRoomSound("leave");
+      else if (typeof playDoor === "function") playDoor();
       net.count = msg.count || 1;
       addLog("Đối thủ mất kết nối. Phòng còn " + (msg.count || 1) + " người.");
       peerReady = false;

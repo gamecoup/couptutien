@@ -1,4 +1,32 @@
 /* game.js — Động cơ cờ, AI Minimax, Timer, Âm thanh & Giao diện */
+// Bộ phát âm thanh tự động khi vào/ra phòng
+let roomAudioCtx = null;
+function playRoomSound(type) {
+  try {
+    if (!roomAudioCtx) roomAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (roomAudioCtx.state === 'suspended') roomAudioCtx.resume();
+    const osc = roomAudioCtx.createOscillator();
+    const gain = roomAudioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(roomAudioCtx.destination);
+
+    if (type === 'join') {
+      osc.frequency.setValueAtTime(587.33, roomAudioCtx.currentTime);
+      osc.frequency.setValueAtTime(880, roomAudioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.25, roomAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, roomAudioCtx.currentTime + 0.3);
+      osc.start();
+      osc.stop(roomAudioCtx.currentTime + 0.3);
+    } else if (type === 'leave') {
+      osc.frequency.setValueAtTime(330, roomAudioCtx.currentTime);
+      osc.frequency.setValueAtTime(220, roomAudioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.2, roomAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, roomAudioCtx.currentTime + 0.3);
+      osc.start();
+      osc.stop(roomAudioCtx.currentTime + 0.3);
+    }
+  } catch (e) {}
+}
 const COLS = 9, ROWS = 10;
 const NAMES = {K:"Tướng", A:"Sĩ", E:"Tượng", H:"Mã", R:"Xe", C:"Pháo", P:"Tốt"};
 const GLYPH = {

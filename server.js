@@ -304,14 +304,29 @@ function validName(s) { return NAME_RE.test(String(s || "")); }
 const NAME_RULE_TEXT = "Tên 6-24 ký tự, chỉ chữ cái không dấu/số/gạch dưới, không khoảng trắng.";
 
 function publicProfile(ws) {
-  if (!ws) return { id: code(), name: "Đạo hữu" };
-  if (ws.profile && ws.profile.id) {
-    return { id: ws.profile.id, name: ws.profile.name || "Đạo hữu" };
+  if (!ws) return { id: code(), name: "Đạo hữu", av: "", avatar: "", pts: 1200, elo: 1200, stats: { games: 0, wins: 0, losses: 0, draws: 0 } };
+  const acc = ws.account;
+  if (acc) {
+    return {
+      id: acc.id,
+      name: acc.name || "Đạo hữu",
+      av: acc.av || "",
+      avatar: acc.av || "",
+      pts: acc.pts != null ? acc.pts : 1200,
+      elo: acc.pts != null ? acc.pts : 1200,
+      stats: acc.stats || { games: 0, wins: 0, losses: 0, draws: 0 }
+    };
   }
-  if (ws.account && ws.account.id) {
-    return { id: ws.account.id, name: ws.account.name || "Đạo hữu" };
-  }
-  return { id: ws._id || (ws._id = code()), name: "Đạo hữu" };
+  const prof = ws.profile || {};
+  return {
+    id: prof.id || ws._id || (ws._id = code()),
+    name: prof.name || "Đạo hữu",
+    av: prof.av || "",
+    avatar: prof.av || "",
+    pts: prof.pts != null ? prof.pts : 1200,
+    elo: prof.elo != null ? prof.elo : 1200,
+    stats: prof.stats || { games: 0, wins: 0, losses: 0, draws: 0 }
+  };
 }
 
 function issueSession(ws) {
@@ -779,6 +794,11 @@ function assignColorsAndJoin(room, ws) {
   ws.roomId = room.id;
   ws.spectate = false;
   send(ws, { type: "joined", room: room.id, color: color, count: room.players.length, variant: room.variant || "up", profile: prof, ready: false, peerReady: false });
+  room.players.forEach((p) => {
+    if (p.ws !== ws) {
+      send(p.ws, { type: "peer-join", color: color, profile: prof, count: room.players.length });
+    }
+  });
   seat(room);
   broadcastList();
 }

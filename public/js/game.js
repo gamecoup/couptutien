@@ -35,17 +35,10 @@ const ELEPHANT_STEPS = [[2,2],[2,-2],[-2,2],[-2,-2]];
 const KING_STEPS = [[1,0],[-1,0],[0,1],[0,-1]];
 const ORTHO_DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 const HORSE_HOPS = [
-  // --- 4 NƯỚC TIẾN ---
-  {bc: 1,  br: 0,  dc: 2,  dr: 1},   // Tiến ngang sang phải
-  {bc:-1,  br: 0,  dc:-2,  dr: 1},   // Tiến ngang sang trái
-  {bc: 0,  br: 1,  dc: 1,  dr: 2},   // Tiến dọc sang phải
-  {bc: 0,  br: 1,  dc:-1,  dr: 2},   // Tiến dọc sang trái
-
-  // --- 4 NƯỚC LÙI ---
-  {bc: 1,  br: 0,  dc: 2,  dr:-1},   // Lùi ngang sang phải
-  {bc:-1,  br: 0,  dc:-2,  dr:-1},   // Lùi ngang sang trái
-  {bc: 0,  br:-1,  dc: 1,  dr:-2},   // Lùi dọc sang phải
-  {bc: 0,  br:-1,  dc:-1,  dr:-2}    // Lùi dọc sang trái
+  {bc:1, br:0, dc:2, dr:1}, {bc:1, br:0, dc:2, dr:-1},
+  {bc:-1, br:0, dc:-2, dr:1}, {bc:-1, br:0, dc:-2, dr:-1},
+  {bc:0, br:1, dc:1, dr:2}, {bc:0, br:1, dc:-1, dr:2},
+  {bc:0, br:-1, dc:1, dr:-2}, {bc:0, br:-1, dc:-1, dr:-2}
 ];
 const canvas = document.getElementById("board");
 const ctx = canvas ? canvas.getContext("2d") : null;
@@ -140,7 +133,7 @@ layout();
 let state, selected, hints, history = [];
 let lastMove = null, lastMoveTime = 0;
 let moveAnim = null;
-const MOVE_SPEED_MS = 550;
+const MOVE_SPEED_MS = 400;
 const LAST_MOVE_GLOW_MS = 5000;
 let timeMode = TIME_MODES[0];
 let clocks = null;
@@ -2299,7 +2292,9 @@ function updateReadyUI() {
     return;
   }
   gate.classList.add("show");
-  const hasOpp = !!net.color && (net.count || 0) >= 2;
+const oppColor = net.color === "red" ? "black" : "red";
+const oppSeat = !!(net.profiles && net.profiles[oppColor] && net.profiles[oppColor].name);
+const hasOpp = !!net.color && ((net.count || 0) >= 2 || oppSeat);
   start.style.display = "none";
   btn.classList.toggle("cancel", !!myReady);
   if (!hasOpp) {
@@ -2318,7 +2313,6 @@ function updateReadyUI() {
   }
   renderModes();
 }
-
 const btnReady = document.getElementById("btnReady");
 if (btnReady) {
   btnReady.onclick = function () {
@@ -2330,7 +2324,6 @@ if (btnReady) {
     updateReadyUI();
   };
 }
-
 function renderBotLevels() {
   const box = document.getElementById("botLevels");
   if (!box) return;
@@ -2340,7 +2333,6 @@ function renderBotLevels() {
     b.disabled = locked;
   });
 }
-
 const botLevelsContainer = document.getElementById("botLevels");
 if (botLevelsContainer) {
   botLevelsContainer.onclick = function (ev) {
@@ -2350,7 +2342,6 @@ if (botLevelsContainer) {
     renderBotLevels();
   };
 }
-
 const btnStart = document.getElementById("btnStart");
 if (btnStart) {
   btnStart.onclick = function () {
@@ -2366,7 +2357,6 @@ if (btnStart) {
     safeNetSend({ type: "begin" });
   };
 }
-
 const btnTime = document.getElementById("btnTime");
 if (btnTime) {
   btnTime.onclick = function (ev) {

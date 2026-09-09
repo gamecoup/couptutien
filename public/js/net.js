@@ -374,6 +374,21 @@ function onNetMsg(ev) {
       break;
 case "lobby":
       if (msg.reason) {
+        alert(msg.reason);
+      }
+      net.room = null;
+      net.color = null;
+      net.isHost = false;
+
+      // Tự động bấm nút quay về trang chính
+      const btnHome = document.getElementById("btnHome");
+      if (btnHome) {
+        btnHome.click();
+      } else {
+        window.location.reload(); // Dự phòng nếu không tìm thấy nút
+      }
+      break;
+      if (msg.reason) {
         if (typeof addLog === "function") addLog(msg.reason);
         alert(msg.reason);
       }

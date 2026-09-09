@@ -120,7 +120,6 @@ canvas {
 #readyGate {
   position: absolute;
   inset: 0;
-  background: rgba(18, 10, 6, 0.45);
   display: none;
   align-items: center;
   justify-content: center;
@@ -153,22 +152,79 @@ canvas {
   margin: 10px 0 14px;
   line-height: 1.4;
 }
-
-#btnReady {
-  background: #2e7d32;
-  font-size: 1rem;
-  padding: 10px 22px;
+/* --- Bộ 3 Nút Sẵn Sàng 3D --- */
+#readyGate button {
+  min-width: 140px;
+  min-height: 42px;
+  padding: 8px 20px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  position: relative;
+  user-select: none;
+  font-family: inherit;
+  margin: 6px 4px;
+  border: 2px solid rgba(255, 235, 150, 0.5);
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
 }
-#btnStart {
-  background: #2e7d32;
+
+/* 1. Nút SẴN SÀNG (Xanh ngọc lục bảo) */
+#readyGate #btnReady {
+  background: linear-gradient(to bottom, #43a047, #1b5e20);
+  box-shadow: 0 4px 0 #0f3813, 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+#readyGate #btnReady:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+  box-shadow: 0 6px 0 #0f3813, 0 8px 18px rgba(0, 0, 0, 0.6);
+}
+#readyGate #btnReady:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #08200a, 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 2. Nút HỦY SẴN SÀNG (Đỏ rượu huyết thạch) */
+#readyGate #btnUnready,
+#readyGate #btnCancelReady,
+#readyGate #btnReady.cancel {
+  background: linear-gradient(to bottom, #c62828, #7f0000);
+  border-color: rgba(255, 205, 210, 0.45);
+  box-shadow: 0 4px 0 #430000, 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+#readyGate #btnUnready:hover,
+#readyGate #btnCancelReady:hover,
+#readyGate #btnReady.cancel:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+  box-shadow: 0 6px 0 #430000, 0 8px 18px rgba(0, 0, 0, 0.6);
+}
+#readyGate #btnUnready:active,
+#readyGate #btnCancelReady:active,
+#readyGate #btnReady.cancel:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #2b0000, 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 3. Nút BẮT ĐẦU (Cam vàng hổ phách) */
+#readyGate #btnStart {
+  background: linear-gradient(to bottom, #ff8f00, #d84315);
+  border-color: #ffe082;
+  box-shadow: 0 4px 0 #5d1700, 0 6px 16px rgba(255, 111, 0, 0.45);
   display: none;
 }
-#btnReady,
-#btnStart {
-  min-width: 132px;
-  min-height: 39px;
-  font-size: 0.9rem;
-  font-weight: 800;
+#readyGate #btnStart:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+  box-shadow: 0 6px 0 #5d1700, 0 8px 20px rgba(255, 111, 0, 0.6);
+}
+#readyGate #btnStart:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #3e0e00, 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 /* Cầu hòa trong ván */
@@ -2049,12 +2105,17 @@ canvas {
   .play-area .side-clocks {
     margin-right: 0;
   }
-  #chatLog {
+ #chatLog {
     width: 220px;
     min-width: 200px;
     max-width: 240px;
-    height: auto;
+    height: 110px !important;
+    max-height: 110px !important;
     align-self: stretch;
     margin-left: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
   }
 }

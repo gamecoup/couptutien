@@ -1,30 +1,12 @@
 /* game.js — Động cơ cờ, AI Minimax, Timer, Âm thanh & Giao diện */
 // Bộ phát âm thanh tự động khi vào/ra phòng
-let roomAudioCtx = null;
 function playRoomSound(type) {
+  const el = document.getElementById(type === 'join' ? 'audJoin' : 'audLeave');
+  if (!el) return;
   try {
-    if (!roomAudioCtx) roomAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (roomAudioCtx.state === 'suspended') roomAudioCtx.resume();
-    const osc = roomAudioCtx.createOscillator();
-    const gain = roomAudioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(roomAudioCtx.destination);
-
-    if (type === 'join') {
-      osc.frequency.setValueAtTime(587.33, roomAudioCtx.currentTime);
-      osc.frequency.setValueAtTime(880, roomAudioCtx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.25, roomAudioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, roomAudioCtx.currentTime + 0.3);
-      osc.start();
-      osc.stop(roomAudioCtx.currentTime + 0.3);
-    } else if (type === 'leave') {
-      osc.frequency.setValueAtTime(330, roomAudioCtx.currentTime);
-      osc.frequency.setValueAtTime(220, roomAudioCtx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.2, roomAudioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, roomAudioCtx.currentTime + 0.3);
-      osc.start();
-      osc.stop(roomAudioCtx.currentTime + 0.3);
-    }
+    el.currentTime = 0;
+    el.volume = 0.8;
+    el.play().catch(() => {});
   } catch (e) {}
 }
 const COLS = 9, ROWS = 10;
@@ -56,11 +38,11 @@ const HORSE_HOPS = [
   {bc:1, br:0, dc:2, dr:1}, {bc:1, br:0, dc:2, dr:-1},
   {bc:-1, br:0, dc:-2, dr:1}, {bc:-1, br:0, dc:-2, dr:-1},
   {bc:0, br:1, dc:1, dr:2}, {bc:0, br:1, dc:-1, dr:2},
-  {bc:0, br:-1, dc:1, dr:-2}, {bc:0, br:-1, dc:-1, dr:-2}
+  {bc:0, br:-1, dc:1, dr:2}, {bc:0, br:-1, dc:-1, dr:2}
 ];
 
 const canvas = document.getElementById("board");
-const ctx = canvas.getContext("2d");
+const ctx = canvas ? canvas.getContext("2d") : null;
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
 var myReady = false;
@@ -89,6 +71,7 @@ function isMobileUI() {
 }
 
 function renderBoardBg() {
+  if (!W || !H) return;
   if (!boardBgCanvas) boardBgCanvas = document.createElement("canvas");
   boardBgCanvas.width = W;
   boardBgCanvas.height = H;
@@ -125,6 +108,7 @@ function renderBoardBg() {
 }
 
 function layout() {
+  if (!canvas) return;
   let maxW;
   if (isMobileUI()) {
     const byW = window.innerWidth - 12;
@@ -650,6 +634,7 @@ function applyMoveBoard(board, mv) {
     nb[r] = (r === mv.fromR || r === mv.toR) ? board[r].slice() : board[r];
   }
   const p = nb[mv.fromR][mv.fromC];
+  if (!p) return board;
   nb[mv.fromR][mv.fromC] = null;
   nb[mv.toR][mv.toC] = {
     color: p.color,
@@ -818,14 +803,18 @@ function paintClocks() {
   if (!clocks) return;
   const sRed = fmtMs(clocks.red);
   const sBlack = fmtMs(clocks.black);
-  if (sRed !== lastTRed) { domClock.tRed.textContent = sRed; lastTRed = sRed; }
-  if (sBlack !== lastTBlack) { domClock.tBlack.textContent = sBlack; lastTBlack = sBlack; }
+  if (domClock.tRed && sRed !== lastTRed) { domClock.tRed.textContent = sRed; lastTRed = sRed; }
+  if (domClock.tBlack && sBlack !== lastTBlack) { domClock.tBlack.textContent = sBlack; lastTBlack = sBlack; }
 
   const redTurn = started && state && !state.over && state.turn === "red";
   const blackTurn = started && state && !state.over && state.turn === "black";
   
-  domClock.clkRed.className = "clock" + (redTurn ? " active" : "") + ((redTurn && clocks.moveLeft < 5000) || clocks.red < 15000 ? " low" : "");
-  domClock.clkBlack.className = "clock" + (blackTurn ? " active" : "") + ((blackTurn && clocks.moveLeft < 5000) || clocks.black < 15000 ? " low" : "");
+  if (domClock.clkRed) {
+    domClock.clkRed.className = "clock" + (redTurn ? " active" : "") + ((redTurn && clocks.moveLeft < 5000) || clocks.red < 15000 ? " low" : "");
+  }
+  if (domClock.clkBlack) {
+    domClock.clkBlack.className = "clock" + (blackTurn ? " active" : "") + ((blackTurn && clocks.moveLeft < 5000) || clocks.black < 15000 ? " low" : "");
+  }
 
   const C = 2 * Math.PI * 32;
   const max = timeMode.moveMs || 1;
@@ -833,6 +822,7 @@ function paintClocks() {
     const wrap = side === "red" ? domClock.wrapRed : domClock.wrapBlack;
     const circ = side === "red" ? domClock.ringRed : domClock.ringBlack;
     const num = side === "red" ? domClock.mvRed : domClock.mvBlack;
+    if (!wrap || !circ || !num) return;
     const left = on ? Math.max(0, clocks.moveLeft) : max;
     const ratio = Math.max(0, Math.min(1, left / max));
     circ.style.strokeDasharray = String(C);
@@ -845,6 +835,7 @@ function paintClocks() {
 }
 
 function setStatus() {
+  if (!statusEl) return;
   if (!started) {
     statusEl.textContent = net.room ? ("Phòng " + net.room + " · đang chờ") : "Ngồi chờ đối thủ.";
     return;
@@ -864,19 +855,28 @@ function startTick() {
   lastTick = performance.now();
   tickId = requestAnimationFrame(onTick);
 }
+
 function stopTick() {
-  if (tickId) cancelAnimationFrame(tickId);
-  tickId = 0;
+  if (tickId) {
+    cancelAnimationFrame(tickId);
+    tickId = 0;
+  }
 }
+
 function onTick(now) {
-  tickId = requestAnimationFrame(onTick);
   const isMoving = moveAnim && (now - moveAnim.start < MOVE_SPEED_MS);
-  if (!state || (!started && !isMoving) || !clocks) return;
+  if (!state || (!started && !isMoving) || !clocks) {
+    stopTick();
+    return;
+  }
+
+  tickId = requestAnimationFrame(onTick);
   const dt = now - lastTick;
   lastTick = now;
   const side = state.turn;
   clocks[side] -= dt;
   clocks.moveLeft -= dt;
+
   if (clocks[side] <= 0) {
     clocks[side] = 0;
     finish(side === "red" ? "black" : "red", "Hết giờ ván (" + timeMode.label + ")");
@@ -887,6 +887,7 @@ function onTick(now) {
     finish(side === "red" ? "black" : "red", "Hết giờ nước (" + (timeMode.moveMs/1000) + " giây)");
     return;
   }
+
   paintClocks();
   const glowing = lastMove && (now - lastMoveTime < LAST_MOVE_GLOW_MS);
   if (started && !state.over && (inCheck(state.board, state.turn) || glowing || isMoving)) draw();
@@ -894,6 +895,7 @@ function onTick(now) {
 
 function finish(winner, reason, fromNet) {
   if (state.over) return;
+  stopTick();
   cancelBotTimer();
   resignPending = false;
   const rBtn = document.getElementById("btnResign");
@@ -1353,45 +1355,60 @@ function botPlay() {
 function mySide() {
   return (typeof net !== "undefined" && net.online && net.color) ? net.color : null;
 }
+
 function showOverlay(winner, reason, rankHtml) {
+  if (!overlay) return;
   const isMate = reason === "Chiếu bí";
   const title = document.getElementById("ovTitle");
   const box = overlay.querySelector(".ov-box");
-  title.textContent = winner === "draw" ? (reason === "Hòa nhau rồi" ? "Hòa nhau rồi" : "Hòa cờ") :
-    (isMate ? "CHIẾU BÍ!" : ((winner === "red" ? "Đỏ" : "Đen") + " thắng"));
-  title.className = "ov-title" + (isMate ? " mate" : "");
-  box.className = "ov-box" + (isMate ? " mate" : "");
-  document.getElementById("ovReason").textContent = reason || "";
-  document.getElementById("ovRank").innerHTML = rankHtml || "";
-  const faces = document.getElementById("ovFaces");
-  faces.innerHTML = "";
-  function card(color, kind) {
-    const d = document.createElement("div");
-    d.className = "face " + kind;
-    d.innerHTML = '<div class="emo">' + (kind === "win" ? "😄" : kind === "lose" ? "😭" : "😐") +
-      '</div><div class="lab">' + (color === "red" ? "Đỏ" : "Đen") + "</div>";
-    faces.appendChild(d);
+  if (title) {
+    title.textContent = winner === "draw" ? (reason === "Hòa nhau rồi" ? "Hòa nhau rồi" : "Hòa cờ") :
+      (isMate ? "CHIẾU BÍ!" : ((winner === "red" ? "Đỏ" : "Đen") + " thắng"));
+    title.className = "ov-title" + (isMate ? " mate" : "");
   }
-  const mine = mySide();
-  if (winner === "draw") {
-    const smile = reason === "Hòa nhau rồi";
-    if (mine) card(mine, smile ? "win" : "draw");
-    else { card("red", smile ? "win" : "draw"); card("black", smile ? "win" : "draw"); }
-  } else if (mine) {
-    card(mine, mine === winner ? "win" : "lose");
-  } else {
-    card(winner, "win");
-    card(winner === "red" ? "black" : "red", "lose");
+  if (box) box.className = "ov-box" + (isMate ? " mate" : "");
+  const rEl = document.getElementById("ovReason");
+  if (rEl) rEl.textContent = reason || "";
+  const rkEl = document.getElementById("ovRank");
+  if (rkEl) rkEl.innerHTML = rankHtml || "";
+  const faces = document.getElementById("ovFaces");
+  if (faces) {
+    faces.innerHTML = "";
+    function card(color, kind) {
+      const d = document.createElement("div");
+      d.className = "face " + kind;
+      d.innerHTML = '<div class="emo">' + (kind === "win" ? "😄" : kind === "lose" ? "😭" : "😐") +
+        '</div><div class="lab">' + (color === "red" ? "Đỏ" : "Đen") + "</div>";
+      faces.appendChild(d);
+    }
+    const mine = mySide();
+    if (winner === "draw") {
+      const smile = reason === "Hòa nhau rồi";
+      if (mine) card(mine, smile ? "win" : "draw");
+      else { card("red", smile ? "win" : "draw"); card("black", smile ? "win" : "draw"); }
+    } else if (mine) {
+      card(mine, mine === winner ? "win" : "lose");
+    } else {
+      card(winner, "win");
+      card(winner === "red" ? "black" : "red", "lose");
+    }
   }
   overlay.classList.add("show");
 }
-function hideOverlay() { overlay.classList.remove("show"); }
 
+function hideOverlay() { 
+  if (overlay) overlay.classList.remove("show"); 
+}
+
+/* ================= KHỐI ÂM THANH ================= */
 let audioCtx = null;
 let sfxOn = true;
 let musicOn = true;
 let sfxVol = 0.8;
 let musicVol = 0.4;
+let homeMusicOn = true;
+let homeVol = 0.35;
+
 function loadAudioPref() {
   try {
     const a = JSON.parse(localStorage.getItem("coupAudio") || "{}");
@@ -1401,37 +1418,54 @@ function loadAudioPref() {
     if (typeof a.musicVol === "number") musicVol = a.musicVol;
   } catch (e) {}
 }
+
 function saveAudioPref() {
   try {
-    localStorage.setItem("coupAudio", JSON.stringify({sfxOn: sfxOn, musicOn: musicOn, sfxVol: sfxVol, musicVol: musicVol}));
+    localStorage.setItem("coupAudio", JSON.stringify({
+      sfxOn: sfxOn, 
+      musicOn: musicOn, 
+      sfxVol: sfxVol, 
+      musicVol: musicVol
+    }));
   } catch (e) {}
 }
 loadAudioPref();
+
 function ensureAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   if (!audioCtx) audioCtx = new AC();
-  if (audioCtx.state === "suspended") audioCtx.resume();
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
   return audioCtx;
 }
+
 function beep(ctx, freq, start, dur, type, gain, volMul) {
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = type || "triangle";
-  o.frequency.setValueAtTime(freq, start);
-  const v = Math.max(0.0001, (gain || 0.12) * (volMul == null ? sfxVol : volMul));
-  g.gain.setValueAtTime(0.0001, start);
-  g.gain.exponentialRampToValueAtTime(v, start + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-  o.connect(g); g.connect(ctx.destination);
-  o.start(start); o.stop(start + dur + 0.02);
+  if (!ctx) return;
+  try {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type || "triangle";
+    o.frequency.setValueAtTime(freq, start);
+    const v = Math.max(0.0001, (gain || 0.12) * (volMul == null ? sfxVol : volMul));
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(v, start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); 
+    g.connect(ctx.destination);
+    o.start(start); 
+    o.stop(start + dur + 0.02);
+  } catch (e) {}
 }
+
 function playClick() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
   if (!ctx) return;
   beep(ctx, 920, ctx.currentTime, 0.035, "triangle", 0.045);
 }
+
 function playStartJingle() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1455,6 +1489,7 @@ function playStartJingle() {
     setTimeout(function () { window.speechSynthesis.speak(u); }, 280);
   } catch (e) {}
 }
+
 function playKnock() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1465,6 +1500,7 @@ function playKnock() {
   beep(ctx, 170, t0 + 0.16, 0.07, "sine", 0.16);
   beep(ctx, 130, t0 + 0.16, 0.08, "triangle", 0.1);
 }
+
 function playDoor() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1474,9 +1510,12 @@ function playDoor() {
   beep(ctx, 160, t0 + 0.05, 0.28, "triangle", 0.08);
   beep(ctx, 90, t0 + 0.12, 0.35, "sine", 0.07);
 }
+
 function noiseBurst(ctx, start, dur, gain, decay) {
+  if (!ctx) return;
   try {
-    const n = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const frameCount = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const n = ctx.createBuffer(1, frameCount, ctx.sampleRate);
     const data = n.getChannelData(0);
     const dcy = decay || 0.03;
     for (let i = 0; i < data.length; i++) {
@@ -1487,10 +1526,12 @@ function noiseBurst(ctx, start, dur, gain, decay) {
     const g = ctx.createGain();
     g.gain.setValueAtTime(Math.max(0.0001, gain * sfxVol), start);
     g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    src.connect(g); g.connect(ctx.destination);
+    src.connect(g); 
+    g.connect(ctx.destination);
     src.start(start);
   } catch (e) {}
 }
+
 function playMoveSound() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1501,22 +1542,18 @@ function playMoveSound() {
   beep(ctx, 85, t0, 0.16, "triangle", 0.5);
   beep(ctx, 55, t0 + 0.02, 0.18, "sine", 0.4);
 }
+
 function playCaptureSound() {
   if (!sfxOn) return;
-  const ctx = ensureAudio();
-  if (!ctx) return;
-  const t0 = ctx.currentTime;
-  noiseBurst(ctx, t0, 0.1, 0.8, 0.015);
-  beep(ctx, 1400, t0, 0.06, "sawtooth", 0.2);
-  beep(ctx, 900, t0 + 0.02, 0.07, "triangle", 0.18);
-  noiseBurst(ctx, t0 + 0.11, 0.1, 0.7, 0.015);
-  beep(ctx, 1200, t0 + 0.11, 0.06, "sawtooth", 0.18);
-  beep(ctx, 720, t0 + 0.14, 0.07, "triangle", 0.15);
-  beep(ctx, 220, t0 + 0.24, 0.22, "sawtooth", 0.25);
-  beep(ctx, 140, t0 + 0.28, 0.28, "sine", 0.3);
-  beep(ctx, 90, t0 + 0.34, 0.32, "triangle", 0.25);
-  beep(ctx, 60, t0 + 0.4, 0.36, "sine", 0.2);
+  const el = document.getElementById('audCapture');
+  if (!el) return;
+  try {
+    el.currentTime = 0;
+    el.volume = sfxVol != null ? sfxVol : 0.9;
+    el.play().catch(() => {});
+  } catch (e) {}
 }
+
 function playCheckTune() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1528,15 +1565,16 @@ function playCheckTune() {
     beep(ctx, f * 1.5, t0 + i * 0.09, 0.08, "sawtooth", 0.03);
   });
 }
+
 function pauseTrack(id) {
   const el = document.getElementById(id);
   if (!el) return;
   try { el.pause(); } catch (e) {}
 }
+
 function stopMusic() { pauseTrack("audGame"); }
-let homeMusicOn = true;
-let homeVol = 0.35;
 function stopHomeMusic() { pauseTrack("audHome"); }
+
 function stopTracks() {
   ["audGame", "audHome"].forEach(function (id) {
     const el = document.getElementById(id);
@@ -1544,26 +1582,32 @@ function stopTracks() {
     try { el.pause(); el.currentTime = 0; } catch (e) {}
   });
 }
+
 function playFile(id, vol) {
   const el = document.getElementById(id);
   if (!el || !el.getAttribute("src")) return false;
   el.volume = Math.max(0, Math.min(1, vol == null ? 0.4 : vol));
   el.loop = true;
-  el.play();
+  try {
+    el.play().catch(() => {});
+  } catch (e) {}
   return true;
 }
+
 function startHomeMusic() {
   stopHomeMusic();
   stopTracks();
   if (!homeMusicOn) return;
   playFile("audHome", homeVol);
 }
+
 function startMusic() {
   stopMusic();
   stopTracks();
   if (!musicOn) return;
   playFile("audGame", musicVol);
 }
+
 function playWinTune() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1575,6 +1619,7 @@ function playWinTune() {
     beep(ctx, f / 2, t0 + i * 0.16, 0.22, "sine", 0.04);
   });
 }
+
 function playLoseTune() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1586,6 +1631,7 @@ function playLoseTune() {
     beep(ctx, f * 1.01, t0 + i * 0.14 + 0.04, 0.12, "sawtooth", 0.03);
   });
 }
+
 function playMateTune() {
   if (!sfxOn) return;
   const ctx = ensureAudio();
@@ -1596,6 +1642,7 @@ function playMateTune() {
     beep(ctx, f / 2, t0 + i * 0.12, 0.18, "triangle", 0.05);
   });
 }
+
 function playEndMusic(winner, reason) {
   if (reason === "Chiếu bí") playMateTune();
   if (winner === "draw") {
@@ -1628,7 +1675,9 @@ function applyViewLayout() {
 }
 
 function cellFromEvent(ev) {
+  if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
   const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
   const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
   let c = Math.round((x - MARGIN) / CELL);
@@ -1637,52 +1686,57 @@ function cellFromEvent(ev) {
   return inBoard(c, r) ? {c, r} : null;
 }
 
-canvas.addEventListener("pointerdown", ev => {
-  ensureAudio();
-  if (net.spectate) return;
-  if (!started || !state || state.over) return;
-  if (moveLock) return;
-  if (moveAnim && performance.now() - moveAnim.start < MOVE_SPEED_MS) return;
-  const sq = cellFromEvent(ev);
-  if (!sq) return;
-  const p = state.board[sq.r][sq.c];
-  if (selected) {
-    for (let i = 0; i < hints.length; i++) {
-      if (hints[i].c === sq.c && hints[i].r === sq.r) {
-        const mv = {fromC: selected.c, fromR: selected.r, toC: sq.c, toR: sq.r};
-        if (net.online && !net.vsBot) {
-          if (net.color && net.color !== state.turn) return;
-          moveLock = true;
-          selected = null; hints = [];
-          draw();
-          relay({kind:"move", mv: mv});
+if (canvas) {
+  canvas.addEventListener("pointerdown", ev => {
+    ensureAudio();
+    if (net.spectate) return;
+    if (!started || !state || state.over) return;
+    if (moveLock) return;
+    if (moveAnim && performance.now() - moveAnim.start < MOVE_SPEED_MS) return;
+    const sq = cellFromEvent(ev);
+    if (!sq) return;
+    const p = state.board[sq.r][sq.c];
+    if (selected) {
+      for (let i = 0; i < hints.length; i++) {
+        if (hints[i].c === sq.c && hints[i].r === sq.r) {
+          const mv = {fromC: selected.c, fromR: selected.r, toC: sq.c, toR: sq.r};
+          if (net.online && !net.vsBot) {
+            if (net.color && net.color !== state.turn) return;
+            moveLock = true;
+            selected = null; hints = [];
+            draw();
+            relay({kind:"move", mv: mv});
+            return;
+          }
+          applyMove(mv);
           return;
         }
-        applyMove(mv);
-        return;
       }
     }
-  }
-  if (net.online && net.color && p && p.color !== net.color) return;
-  if (net.online && net.color && net.color !== state.turn) return;
-  if (p && p.color === state.turn) {
-    selected = sq;
-    hints = legalMoves(state.board, sq.c, sq.r);
-    const how = walkAs(p);
-    statusEl.textContent = (p.revealed ? NAMES[p.type] : ("Úp — nước này đi như " + NAMES[how])) +
-      " · " + hints.length + " nước";
-    draw();
-  } else {
-    selected = null; hints = []; setStatus(); draw();
-  }
-});
+    if (net.online && net.color && p && p.color !== net.color) return;
+    if (net.online && net.color && net.color !== state.turn) return;
+    if (p && p.color === state.turn) {
+      selected = sq;
+      hints = legalMoves(state.board, sq.c, sq.r);
+      const how = walkAs(p);
+      if (statusEl) {
+        statusEl.textContent = (p.revealed ? NAMES[p.type] : ("Úp — nước này đi như " + NAMES[how])) +
+          " · " + hints.length + " nước";
+      }
+      draw();
+    } else {
+      selected = null; hints = []; setStatus(); draw();
+    }
+  });
+}
 
 function drawBoard() {
   if (!boardBgCanvas) renderBoardBg();
-  ctx.drawImage(boardBgCanvas, 0, 0);
+  if (ctx && boardBgCanvas) ctx.drawImage(boardBgCanvas, 0, 0);
 }
 
 function drawPiece(p, c, r, checkedKing) {
+  if (!ctx) return;
   const x = MARGIN + viewC(c) * CELL, y = MARGIN + viewR(r) * CELL, rad = CELL * 0.407;
   const isCheckKing = checkedKing && p.type === "K" && p.color === checkedKing;
   if (isCheckKing) {
@@ -1721,7 +1775,7 @@ function drawPiece(p, c, r, checkedKing) {
 }
 
 function draw() {
-  if (!state) return;
+  if (!state || !ctx) return;
   drawBoard();
   if (selected) {
     const x = MARGIN + viewC(selected.c) * CELL, y = MARGIN + viewR(selected.r) * CELL;
@@ -1890,13 +1944,25 @@ function showChat(who, txt) {
   if (log) {
     const line = document.createElement("div");
     line.className = "line";
+    
+    // Ép kiểu CSS trực tiếp đảm bảo tin nhắn luôn ngắt dòng gọn gàng
+    line.style.wordBreak = "break-word";
+    line.style.overflowWrap = "anywhere";
+    line.style.whiteSpace = "normal";
+
     const whoEl = document.createElement("span");
     whoEl.className = "who";
     whoEl.textContent = who + ":";
     line.appendChild(whoEl);
     line.appendChild(document.createTextNode(" " + txt));
+    
     log.appendChild(line);
-    log.scrollTop = log.scrollHeight;
+
+    // Tự động cuộn xuống dòng tin nhắn mới nhất
+    requestAnimationFrame(() => {
+      log.scrollTop = log.scrollHeight;
+    });
+
     if (isMobileUI()) {
       log.classList.add("show-log");
       clearTimeout(chatLogHideTimer);
@@ -1911,29 +1977,51 @@ function sendChat(txt) {
   const qw = document.getElementById("quickWrap");
   if (cw) cw.classList.remove("open");
   if (qw) qw.classList.remove("open");
-  if (net.online && !net.vsBot) {
-    relay({kind:"chat", text: txt});
-    return;
+
+  // Gửi qua mạng nếu đang kết nối WebSocket thực sự
+  if (net && net.online && !net.vsBot && net.ws && net.ws.readyState === 1) {
+    relay({kind: "chat", text: txt});
   }
-  const who = typeof ownName === "function" ? ownName() : (state && state.turn === "red" ? "Đỏ" : "Đen");
-  showChat(who, txt);
 }
-(function buildQuickChat() {
+
+function buildQuickChat() {
   const box = document.getElementById("quickPop");
   if (!box) return;
-  QUICK.forEach(function (txt) {
-    const b = document.createElement("button");
-    b.textContent = txt;
-    b.onclick = function () { sendChat(txt); };
-    box.appendChild(b);
-  });
-  EMO.forEach(function (e) {
-    const b = document.createElement("button");
-    b.textContent = e;
-    b.onclick = function () { sendChat(e); };
-    box.appendChild(b);
-  });
-})();
+  box.innerHTML = ""; // Xóa các phần tử cũ tránh trùng lặp
+
+  if (Array.isArray(QUICK)) {
+    QUICK.forEach(function (txt) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = txt;
+      b.onclick = function (ev) {
+        if (ev) ev.stopPropagation();
+        sendChat(txt);
+      };
+      box.appendChild(b);
+    });
+  }
+
+  if (Array.isArray(EMO)) {
+    EMO.forEach(function (e) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = e;
+      b.onclick = function (ev) {
+        if (ev) ev.stopPropagation();
+        sendChat(e);
+      };
+      box.appendChild(b);
+    });
+  }
+}
+
+// Đảm bảo DOM sẵn sàng trước khi gán sự kiện cho các nút
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", buildQuickChat);
+} else {
+  buildQuickChat();
+}
 
 const btnChat = document.getElementById("btnChat");
 if (btnChat) {
@@ -1949,6 +2037,7 @@ if (btnChat) {
     if (t) setTimeout(function () { t.focus(); }, 0);
   };
 }
+
 const btnQuick = document.getElementById("btnQuick");
 if (btnQuick) {
   btnQuick.onclick = function (ev) {
@@ -1959,6 +2048,7 @@ if (btnQuick) {
     if (cw) cw.classList.remove("open");
   };
 }
+
 const btnChatSend = document.getElementById("btnChatSend");
 if (btnChatSend) {
   btnChatSend.onclick = function (ev) {
@@ -1970,6 +2060,7 @@ if (btnChatSend) {
     }
   };
 }
+
 const chatText = document.getElementById("chatText");
 if (chatText) {
   chatText.addEventListener("keydown", function (e) {
@@ -1980,6 +2071,7 @@ if (chatText) {
     }
   });
 }
+
 const chatPop = document.getElementById("chatPop");
 if (chatPop) chatPop.addEventListener("click", function (e) { e.stopPropagation(); });
 const quickPop = document.getElementById("quickPop");
@@ -1998,10 +2090,12 @@ function hideDrawAsk() {
   const el = document.getElementById("drawAsk");
   if (el) el.classList.remove("show");
 }
+
 function showDrawAsk() {
   const el = document.getElementById("drawAsk");
   if (el) el.classList.add("show");
 }
+
 function myTurnNow() {
   if (!state || state.over) return false;
   if (!net.color) return false;
@@ -2140,6 +2234,7 @@ function updateReadyUI() {
   gate.classList.add("show");
   const hasOpp = !!net.color && (net.count || 0) >= 2;
   start.style.display = "none";
+  btn.classList.toggle("cancel", !!myReady);
   if (!hasOpp) {
     hint.textContent = "Đang ngồi chờ đối thủ vào bàn " + (net.room || "") + "...";
     btn.style.display = "inline-block";
@@ -2382,9 +2477,9 @@ function openProfile(color) {
   }
   const up = document.getElementById("btnProfUpload");
   const save = document.getElementById("btnProfSave");
-  if (up) up.style.display = "none";
+  if (up) up.style.display = mine ? "inline-block" : "none";
   if (save) {
-    save.style.display = "none";
+    save.style.display = mine ? "inline-block" : "none";
     save.disabled = true;
   }
   let pending = null;
@@ -2417,11 +2512,6 @@ function openProfile(color) {
   const pPop = document.getElementById("profPop");
   if (pPop) pPop.classList.add("show");
 }
-
-const avRed = document.getElementById("avRed");
-if (avRed) avRed.onclick = function () { openProfile("red"); };
-const avBlack = document.getElementById("avBlack");
-if (avBlack) avBlack.onclick = function () { openProfile("black"); };
 const btnProfClose = document.getElementById("btnProfClose");
 if (btnProfClose) {
   btnProfClose.onclick = function () {

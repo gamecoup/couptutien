@@ -35,12 +35,18 @@ const ELEPHANT_STEPS = [[2,2],[2,-2],[-2,2],[-2,-2]];
 const KING_STEPS = [[1,0],[-1,0],[0,1],[0,-1]];
 const ORTHO_DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 const HORSE_HOPS = [
-  {bc:1, br:0, dc:2, dr:1}, {bc:1, br:0, dc:2, dr:-1},
-  {bc:-1, br:0, dc:-2, dr:1}, {bc:-1, br:0, dc:-2, dr:-1},
-  {bc:0, br:1, dc:1, dr:2}, {bc:0, br:1, dc:-1, dr:2},
-  {bc:0, br:-1, dc:1, dr:2}, {bc:0, br:-1, dc:-1, dr:2}
-];
+  // --- 4 NƯỚC TIẾN ---
+  {bc: 1,  br: 0,  dc: 2,  dr: 1},   // Tiến ngang sang phải
+  {bc:-1,  br: 0,  dc:-2,  dr: 1},   // Tiến ngang sang trái
+  {bc: 0,  br: 1,  dc: 1,  dr: 2},   // Tiến dọc sang phải
+  {bc: 0,  br: 1,  dc:-1,  dr: 2},   // Tiến dọc sang trái
 
+  // --- 4 NƯỚC LÙI ---
+  {bc: 1,  br: 0,  dc: 2,  dr:-1},   // Lùi ngang sang phải
+  {bc:-1,  br: 0,  dc:-2,  dr:-1},   // Lùi ngang sang trái
+  {bc: 0,  br:-1,  dc: 1,  dr:-2},   // Lùi dọc sang phải
+  {bc: 0,  br:-1,  dc:-1,  dr:-2}    // Lùi dọc sang trái
+];
 const canvas = document.getElementById("board");
 const ctx = canvas ? canvas.getContext("2d") : null;
 const statusEl = document.getElementById("status");
@@ -1300,13 +1306,45 @@ function botSearchOnBoard(board, color, depth, timeMs, rootMoves) {
   }
   return {move: bestMove, score: bestScore};
 }
+// Phân tích tính ép buộc và an toàn theo tương quan thời gian
+function adjustScoreByTimeDynamic(rawScore, board, mv, myColor) {
+  if (!clocks) return rawScore;
+  const oppColor = myColor === "red" ? "black" : "red";
+  const myMs = clocks[myColor] || 0;
+  const oppMs = clocks[oppColor] || 0;
+  const timeDelta = myMs - oppMs;
+
+  const nb = applyMoveBoard(board, mv);
+  const targetPiece = board[mv.toR][mv.toC];
+  const causesCheck = inCheck(nb, oppColor);
+  
+  let forcingScore = 0;
+  if (causesCheck) forcingScore += 700;
+  if (targetPiece) forcingScore += (BOT_PIECE_VAL[targetPiece.type] || 100) * 1.5;
+
+  let adjusted = rawScore;
+  // Kém giờ hơn đối thủ: Ưu tiên chiếu hoặc bắt quân để đốt giờ đối phương
+  if (timeDelta < -3000) {
+    adjusted += forcingScore * Math.min(3, Math.abs(timeDelta) / 8000);
+  } 
+  // Hơn giờ nhưng cờ đang lép: Giữ thế an toàn, chờ đối thủ hết giờ
+  else if (timeDelta > 5000 && rawScore < -150) {
+    if (!causesCheck && !targetPiece) adjusted += 60;
+  }
+  return adjusted;
+}
+
 function botChooseMove(board, color, captured, level) {
   const rootMoves = allLegal(board, color);
   if (!rootMoves.length) return null;
+  // Nước đi bắt buộc: Phản xạ ngay không tốn tài nguyên
+  if (rootMoves.length === 1) return rootMoves[0];
+
   const samples = Math.max(1, level.samples || 1);
-  const perSampleMs = Math.max(80, Math.floor((level.timeMs || 700) / samples));
+  const perSampleMs = Math.max(60, Math.floor((level.timeMs || 700) / samples));
   botKillers = {}; botHistory = {};
   const tally = new Map();
+
   for (let s = 0; s < samples; s++) {
     const sampledBoard = botDeterminize(board, captured);
     const result = botSearchOnBoard(sampledBoard, color, level.depth, perSampleMs, rootMoves);
@@ -1318,34 +1356,63 @@ function botChooseMove(board, color, captured, level) {
     cur.avgScore = cur.total / cur.count;
     tally.set(key, cur);
   }
+
   const candidates = [];
-  tally.forEach(v => candidates.push(v));
+  tally.forEach(v => {
+    const score = adjustScoreByTimeDynamic(v.avgScore, board, v.move, color);
+    candidates.push({ move: v.move, score: score });
+  });
+
   if (!candidates.length) return rootMoves[Math.floor(Math.random() * rootMoves.length)];
-  candidates.sort((a, b) => (b.count !== a.count) ? b.count - a.count : b.avgScore - a.avgScore);
+  candidates.sort((a, b) => b.score - a.score);
+
   if (level.mistakeChance && Math.random() < level.mistakeChance) {
     return rootMoves[Math.floor(Math.random() * rootMoves.length)];
   }
-  const topScore = candidates[0].avgScore;
-  const topMoves = candidates.filter(c => Math.abs(c.avgScore - topScore) <= 40);
-  const chosen = topMoves[Math.floor(Math.random() * topMoves.length)];
-  return chosen ? chosen.move : candidates[0].move;
+
+  // Cấp cao đánh nước tối ưu nhất tuyệt đối, không lấy ngẫu nhiên 40 điểm nữa
+  return candidates[0].move;
 }
+
 function botPlay() {
   botTimer = null;
   if (!net.vsBot || !state || state.over) return;
   const color = state.turn;
   if (net.color && color === net.color) return;
+
+  const rootMoves = allLegal(state.board, color);
+  if (!rootMoves.length) return;
+  if (rootMoves.length === 1) {
+    applyMove(rootMoves[0], true);
+    return;
+  }
+
   const levelKey = net.botLevel || "normal";
   const level = botAdaptLevel(BOT_LEVELS[levelKey] || BOT_LEVELS.normal, levelKey);
+
+  // Phân bổ ngân sách thời gian động theo ván cờ
   let timeMs = level.timeMs;
-  if (clocks && typeof clocks.moveLeft === "number") timeMs = Math.max(150, Math.min(timeMs, clocks.moveLeft * 0.6));
+  if (clocks) {
+    const myTotal = clocks[color] || 0;
+    const moveLeft = clocks.moveLeft || timeMode.moveMs;
+    // Cận giờ (<12s): Ép bot đi nhanh dưới 200ms
+    if (myTotal < 12000) {
+      timeMs = Math.min(200, Math.floor(moveLeft * 0.25));
+    } else {
+      const estimatedRemMoves = Math.max(10, 30 - Math.floor((state.ply || 0) / 2));
+      timeMs = Math.min(timeMs, Math.floor(myTotal / estimatedRemMoves), Math.floor(moveLeft * 0.65));
+    }
+  }
 
   const t0 = performance.now();
-  const pick = botChooseMove(state.board, color, state.captured, Object.assign({}, level, {timeMs: timeMs}));
+  const pick = botChooseMove(state.board, color, state.captured, Object.assign({}, level, {timeMs: Math.max(80, timeMs)}));
   const thinkTime = performance.now() - t0;
 
-  if (clocks && clocks[color]) {
+  // SỬA LỖI TRỪ GIỜ KÉP: Đồng bộ lại mốc tick
+  lastTick = performance.now();
+  if (clocks && typeof clocks[color] === "number") {
     clocks[color] = Math.max(0, clocks[color] - thinkTime);
+    clocks.moveLeft = Math.max(0, clocks.moveLeft - thinkTime);
   }
 
   if (!pick) return;

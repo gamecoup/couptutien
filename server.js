@@ -485,7 +485,7 @@ function pruneRoom(room) {
     }
 
     if (room.busy && !room.over) {
-      if (p.awaySince && now - p.awaySince < 120000) {
+      if (p.awaySince && now - p.awaySince < 90000) {
         return true;
       }
       droppedAway = true;
@@ -493,7 +493,7 @@ function pruneRoom(room) {
     }
 
     const waitStart = p.autoResignedAt || room.finishedAt || p.awaySince;
-    if (waitStart && (now - waitStart > 40000)) {
+    if (waitStart && (now - waitStart > 10000)) {
       droppedAway = true;
       if (p.ws) {
         try { p.ws.roomId = null; p.ws.terminate(); } catch (e) {}
@@ -512,7 +512,7 @@ function pruneRoom(room) {
     if (now - room.idleSince > 30000) { // 30 giây (30000 ms)
       room.players.forEach(p => {
         try {
-          send(p.ws, { type: "lobby", reason: "Phòng tự hủy do quá 40s chưa bắt đầu ván." });
+          send(p.ws, { type: "lobby", reason: "Phòng tự hủy do quá 30s chưa bắt đầu ván." });
         } catch (e) {}
       });
       rooms.delete(room.id);

@@ -506,10 +506,10 @@ function pruneRoom(room) {
 
   room.specs = (room.specs || []).filter((s) => live(s));
   
-// Quá 40s mà ván cờ chưa bắt đầu (dù có người ra vào hay ngồi ngắm nhau) -> Giải tán phòng
+// Quá 30s mà ván cờ chưa bắt đầu (dù có người ra vào hay ngồi ngắm nhau) -> Giải tán phòng
   if (!room.busy) {
     if (!room.idleSince) room.idleSince = now;
-    if (now - room.idleSince > 40000) { // 40 giây (40000 ms)
+    if (now - room.idleSince > 30000) { // 30 giây (30000 ms)
       room.players.forEach(p => {
         try {
           send(p.ws, { type: "lobby", reason: "Phòng tự hủy do quá 40s chưa bắt đầu ván." });

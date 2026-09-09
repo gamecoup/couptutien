@@ -506,22 +506,21 @@ function pruneRoom(room) {
 
   room.specs = (room.specs || []).filter((s) => live(s));
   
-// Đếm giờ nếu phòng chưa đủ 2 người và không đang trong trận đánh
-  if (room.players.length < 2 && !room.busy) {
-    if (!room.emptySince) room.emptySince = now;
-    if (now - room.emptySince > 40000) { // 40 giây (40000 ms)
-      // Thông báo cho người duy nhất đang treo trong phòng (nếu có)
+// Quá 40s mà ván cờ chưa bắt đầu (dù có người ra vào hay ngồi ngắm nhau) -> Giải tán phòng
+  if (!room.busy) {
+    if (!room.idleSince) room.idleSince = now;
+    if (now - room.idleSince > 40000) { // 40 giây (40000 ms)
       room.players.forEach(p => {
         try {
-          send(p.ws, { type: "lobby", reason: "Phòng tự hủy do quá thời gian chờ đối thủ (40s)." });
+          send(p.ws, { type: "lobby", reason: "Phòng tự hủy do quá 40s chưa bắt đầu ván." });
         } catch (e) {}
       });
       rooms.delete(room.id);
       return false;
     }
   } else {
-    // Đã đủ 2 người hoặc đang chơi thì hủy đếm giờ
-    room.emptySince = null;
+    // Trận đấu bắt đầu -> Xóa mốc đếm giờ
+    room.idleSince = null;
   }
 
   if (!room.players.some((p) => p.host) && room.players.length > 0) {

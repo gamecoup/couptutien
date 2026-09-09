@@ -372,7 +372,20 @@ function onNetMsg(ev) {
       if (typeof playRoomSound === "function") playRoomSound("join");
       else if (typeof playDoor === "function") playDoor();
       break;
-
+case "lobby":
+      if (msg.reason) {
+        if (typeof addLog === "function") addLog(msg.reason);
+        alert(msg.reason);
+      }
+      net.room = null;
+      net.color = null;
+      net.isHost = false;
+      if (typeof showHall === "function") {
+        showHall();
+      } else if (typeof showLobby === "function") {
+        showLobby();
+      }
+      break;
     case "peer-left":
       if (typeof playRoomSound === "function") playRoomSound("leave");
       else if (typeof playDoor === "function") playDoor();

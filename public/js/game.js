@@ -750,14 +750,39 @@ function isChaseMove(board, fromC, fromR, toC, toR, color, trace) {
   return false;
 }
 function bannedRepeat(board, fromC, fromR, toC, toR, color) {
+  // 1. Nước ăn quân làm thay đổi vĩnh viễn bàn cờ -> Luôn mở khóa, không bao giờ cấm
+  if (board[toR] && board[toR][toC]) return false;
+
   const nb = applyMoveBoard(board, {fromC: fromC, fromR: fromR, toC: toC, toR: toR});
   const opp = color === "red" ? "black" : "red";
   const chk = inCheck(nb, opp);
   const chase = isChaseMove(board, fromC, fromR, toC, toR, color, state && state.trace);
-  const keys = ((state && state.trace) || []).map(t => t.key).concat([boardKey(nb, opp)]);
-  if (chk && consecFlag(state && state.trace, color, "check") >= 3) return true;
-  if (chase && consecFlag(state && state.trace, color, "chase") >= 3) return true;
-  if ((chk || chase) && cycleTriple(keys)) return true;
+
+  // Nước sắp đi không chiếu và không đuổi -> Tự do di chuyển
+  if (!chk && !chase) return false;
+
+  const trace = (state && state.trace) || [];
+  const maxQuiet = (state && typeof state.quietPly === "number") ? state.quietPly : trace.length;
+  const validTrace = maxQuiet > 0 ? trace.slice(-maxQuiet) : [];
+
+  // 2. GOM CHUỖI TẤN CÔNG (Chiếu hoặc Đuổi, bất kể 1 quân hay nhiều quân phối hợp)
+  const attackMoves = [];
+  for (let i = validTrace.length - 1; i >= 0; i--) {
+    const t = validTrace[i];
+    if (t.color !== color) continue;
+    if (t.capture || t.captured) break; // Ăn quân -> Đổi cục diện -> Xóa sạch chuỗi
+    if (!t.check && !t.chase) break;    // Ngừng tấn công -> Đứt chuỗi
+    attackMoves.push(t);
+  }
+
+  // 3. TỪ NƯỚC TẤN CÔNG THỨ 4 TRỞ ĐI (Đã liên tục chiếu/đuổi >= 3 hiệp):
+  // Khóa TẤT CẢ các ô cờ đã từng dùng trong chuỗi, bất kể đưa quân nào vào đó
+  if (attackMoves.length >= 3) {
+    const isRepeatSquare = attackMoves.some(t => 
+      (t.toC === toC && t.toR === toR) || (t.fromC === toC && t.fromR === toR)
+    );
+    if (isRepeatSquare) return true; // CẤM: Trùng lại ô cũ -> Khóa chấm xanh
+  }
   return false;
 }
 function legalMoves(board, c, r) {
@@ -982,10 +1007,22 @@ function applyMove(mv, fromNet, extra) {
     finish(state.turn, "Ăn Tướng");
     return;
   }
-  if (state.quietPly >= 100) {
-    finish("draw", "Hòa 50 nước không ăn quân");
-    return;
-  }
+  // Cảnh báo đếm nước hòa theo luật 60 hiệp (120 ply)
+if (state.quietPly === 100) {
+  showCenterNotice("⚠️ Cảnh báo: Còn 10 hiệp không ăn quân sẽ Hòa!");
+} else if (state.quietPly === 110) {
+  showCenterNotice("⚠️ Cảnh báo: Còn 5 hiệp không ăn quân sẽ Hòa!");
+}
+
+if (state.quietPly >= 120) {
+  finish("draw", "Hòa 60 nước không ăn quân");
+  return;
+}
+
+    if (state.quietPly >= 120) {
+      finish("draw", "Hòa 60 nước không ăn quân");
+      return;
+    }
   const oppMoves = allLegal(state.board, opp);
   if (!oppMoves.length) {
     if (inCheck(state.board, opp)) finish(state.turn, "Chiếu bí");
@@ -2589,3 +2626,36 @@ refreshSoundButtons();
 resetBoard();
 paintRanks();
 showLobby();
+function showCenterNotice(text, duration = 3000) {
+  let box = document.getElementById("center-notice");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "center-notice";
+    box.style.position = "fixed";
+    box.style.top = "50%";
+    box.style.left = "50%";
+    box.style.transform = "translate(-50%, -50%)";
+    box.style.backgroundColor = "rgba(18, 18, 18, 0.9)";
+    box.style.color = "#ffd700";
+    box.style.padding = "16px 28px";
+    box.style.borderRadius = "10px";
+    box.style.border = "2px solid #ffd700";
+    box.style.boxShadow = "0 0 25px rgba(255, 215, 0, 0.5)";
+    box.style.fontSize = "18px";
+    box.style.fontWeight = "bold";
+    box.style.textAlign = "center";
+    box.style.zIndex = "99999";
+    box.style.pointerEvents = "none";
+    box.style.transition = "opacity 0.4s ease";
+    document.body.appendChild(box);
+  }
+  box.innerText = text;
+  box.style.display = "block";
+  box.style.opacity = "1";
+
+  clearTimeout(box._timer);
+  box._timer = setTimeout(() => {
+    box.style.opacity = "0";
+    setTimeout(() => { box.style.display = "none"; }, 400);
+  }, duration);
+}
